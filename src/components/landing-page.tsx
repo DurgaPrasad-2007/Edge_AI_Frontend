@@ -206,13 +206,7 @@ export function LandingPage() {
   const auth = useAuth();
   const [state, setState] = useState<SimulationState>(initialFleetState);
   const [apiStatus, setApiStatus] = useState<"connecting" | "online" | "offline">("connecting");
-  const [tasks, setTasks] = useState<TaskRecord[]>([]);
-  const [showConsoleModal, setShowConsoleModal] = useState(false);
   const [showUserModal, setShowUserModal] = useState(false);
-  const [loginForm, setLoginForm] = useState({ email: "admin@edgefleet.local", password: "EdgeFleet-Local-Change-Me-2026!" });
-  const [loginError, setLoginError] = useState("");
-  const [taskForm, setTaskForm] = useState({ pickup: "Aisle A-03", destination: "Dock-West", priority: 80 });
-  const [taskNotice, setTaskNotice] = useState("");
   const [vectorQuery, setVectorQuery] = useState("Corridor C-14 choke point arbitration");
   const [vectorLoading, setVectorLoading] = useState(false);
   const [vectorResults, setVectorResults] = useState<Array<{ id: string; source_name: string; content: string; metadata?: Record<string, string> }>>([]);
@@ -272,26 +266,6 @@ export function LandingPage() {
     };
   }, [auth.session]);
 
-  const refreshTasks = async () => {
-    if (!auth.session) return;
-    try {
-      const res = await fetch(`${apiBase}/api/tasks`, {
-        headers: { Authorization: `Bearer ${auth.session.access_token}` },
-      });
-      if (res.ok) {
-        setTasks((await res.json()) as TaskRecord[]);
-      }
-    } catch {
-      // Ignored
-    }
-  };
-
-  useEffect(() => {
-    if (auth.session) {
-      void refreshTasks();
-    }
-  }, [auth.session]);
-
   const sendControl = async (endpoint: string, body?: object) => {
     try {
       const headers: Record<string, string> = { "Content-Type": "application/json" };
@@ -306,43 +280,6 @@ export function LandingPage() {
       }
     } catch {
       // Fallback
-    }
-  };
-
-  const handleSignIn = async (e: FormEvent) => {
-    e.preventDefault();
-    setLoginError("");
-    try {
-      await auth.signIn(loginForm.email, loginForm.password);
-      setShowConsoleModal(false);
-      await refreshTasks();
-    } catch (err) {
-      setLoginError(err instanceof Error ? err.message : "Authentication failed");
-    }
-  };
-
-  const handleCreateTask = async (e: FormEvent) => {
-    e.preventDefault();
-    if (!auth.session) {
-      setShowConsoleModal(true);
-      return;
-    }
-    try {
-      const res = await fetch(`${apiBase}/api/tasks`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${auth.session.access_token}`,
-        },
-        body: JSON.stringify(taskForm),
-      });
-      if (res.ok) {
-        const created = (await res.json()) as TaskRecord;
-        setTaskNotice(`Task ${created.id} dispatched to ${created.assigned_robot_id ?? "Queue"}`);
-        await refreshTasks();
-      }
-    } catch {
-      setTaskNotice("Failed to dispatch task");
     }
   };
 
@@ -374,38 +311,45 @@ export function LandingPage() {
           </ul>
 
           <div className="nav-actions">
-            <div className="status-indicator">
-              <span className="status-dot" style={{ backgroundColor: apiStatus === "online" ? "#10B981" : "#EF4444" }} />
+            <div className={`status-indicator ${apiStatus !== "online" ? "offline" : ""}`}>
+              <span className={`status-dot ${apiStatus !== "online" ? "offline" : ""}`} />
               <span>{apiStatus === "online" ? "EDGE MESH LIVE" : "BRIDGE OFFLINE"}</span>
             </div>
             {auth.user ? (
-              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                <div className="font-mono" style={{ fontSize: "11px", color: "var(--text-secondary)", display: "flex", alignItems: "center", gap: "6px" }}>
-                  <span>{auth.user.email}</span>
-                  <span className="badge" style={{ fontSize: "9px", padding: "1px 5px", background: "rgba(16,185,129,0.15)", color: "var(--accent-emerald)" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px", flexShrink: 0 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "6px", background: "rgba(255,255,255,0.04)", padding: "4px 8px", borderRadius: "6px", border: "1px solid rgba(255,255,255,0.08)" }}>
+                  <span style={{ fontSize: "11px", color: "var(--text-secondary)", fontFamily: "var(--font-mono)" }}>
+                    {auth.user.email}
+                  </span>
+                  <span style={{ fontSize: "9.5px", fontWeight: "700", fontFamily: "var(--font-mono)", padding: "2px 5px", borderRadius: "3px", background: "rgba(16,185,129,0.15)", color: "#10B981" }}>
                     {auth.user.roles[0]?.toUpperCase()}
                   </span>
                 </div>
                 {auth.user.roles.includes("admin") && (
                   <button
-                    className="btn btn-secondary font-mono"
-                    style={{ padding: "6px 12px", fontSize: "11px", borderColor: "var(--accent-emerald)", color: "var(--accent-emerald)", cursor: "pointer" }}
+                    type="button"
+                    className="btn btn-secondary"
                     onClick={() => setShowUserModal(true)}
                   >
-                    User Directory &amp; RBAC
+                    User Directory
                   </button>
                 )}
-                <a href="/console" className="btn btn-primary" style={{ padding: "6px 12px", fontSize: "11px" }}>
+                <a href="/console" className="btn btn-primary">
                   Console &rarr;
                 </a>
-                <button className="btn btn-secondary font-mono" style={{ padding: "6px 12px", fontSize: "11px" }} onClick={() => auth.signOut()}>
+                <button type="button" className="btn btn-secondary" onClick={() => auth.signOut()}>
                   Sign out
                 </button>
               </div>
             ) : (
-              <a href="/console" className="btn btn-primary" id="btn-operator-console-header" style={{ padding: "7px 14px", fontSize: "12px" }}>
-                Operator Console &rarr;
-              </a>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px", flexShrink: 0 }}>
+                <a href="/login" className="btn btn-secondary">
+                  Sign In
+                </a>
+                <a href="/console" className="btn btn-primary" id="btn-operator-console-header">
+                  Operator Console &rarr;
+                </a>
+              </div>
             )}
           </div>
         </div>
@@ -1023,154 +967,7 @@ export function LandingPage() {
         </section>
       </main>
 
-      {/* Operator Console Modal */}
-      {showConsoleModal && (
-        <div className="console-modal-backdrop" onClick={() => setShowConsoleModal(false)}>
-          <div className="console-modal-card" onClick={(e) => e.stopPropagation()}>
-            <button className="modal-close-btn" onClick={() => setShowConsoleModal(false)}>✕</button>
 
-            <div style={{ marginBottom: "20px" }}>
-              <span className="font-mono" style={{ fontSize: "11px", color: "var(--accent-emerald)" }}>
-                AUTHORIZED OPERATOR GATEWAY
-              </span>
-              <h2 style={{ fontSize: "22px", fontWeight: "700", marginTop: "4px" }}>
-                {auth.user ? "Operator Mission Control" : "Operator Sign-In"}
-              </h2>
-              <p style={{ fontSize: "13px", color: "var(--text-secondary)", marginTop: "4px" }}>
-                {auth.user
-                  ? `Authenticated as ${auth.user.email} (Roles: ${auth.user.roles.join(", ")})`
-                  : "Authenticate through the protected EdgeFleet backend API."}
-              </p>
-            </div>
-
-            {!auth.user ? (
-              <form onSubmit={handleSignIn}>
-                <div
-                  className="quick-demo-pill"
-                  onClick={() =>
-                    setLoginForm({
-                      email: "admin@edgefleet.local",
-                      password: "EdgeFleet-Local-Change-Me-2026!",
-                    })
-                  }
-                >
-                  <span>Click to populate pre-configured administrator credentials</span>
-                  <strong style={{ color: "var(--accent-emerald)" }}>AUTOFILL</strong>
-                </div>
-
-                <div className="login-field">
-                  <label>Operator Email</label>
-                  <input
-                    type="email"
-                    value={loginForm.email}
-                    onChange={(e) => setLoginForm({ ...loginForm, email: e.target.value })}
-                    required
-                  />
-                </div>
-
-                <div className="login-field">
-                  <label>Password</label>
-                  <input
-                    type="password"
-                    value={loginForm.password}
-                    onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })}
-                    required
-                  />
-                </div>
-
-                {loginError && (
-                  <p style={{ color: "var(--accent-rose)", fontSize: "12px", marginBottom: "16px" }}>
-                    {loginError}
-                  </p>
-                )}
-
-                <button type="submit" className="btn btn-primary" style={{ width: "100%", padding: "11px" }}>
-                  Sign In to Dispatch Console
-                </button>
-              </form>
-            ) : (
-              <div>
-                {/* Authenticated Task Dispatch */}
-                <form onSubmit={handleCreateTask} style={{ marginBottom: "20px" }}>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
-                    <div className="login-field">
-                      <label>Pickup Node</label>
-                      <input
-                        value={taskForm.pickup}
-                        onChange={(e) => setTaskForm({ ...taskForm, pickup: e.target.value })}
-                        required
-                      />
-                    </div>
-                    <div className="login-field">
-                      <label>Destination</label>
-                      <input
-                        value={taskForm.destination}
-                        onChange={(e) => setTaskForm({ ...taskForm, destination: e.target.value })}
-                        required
-                      />
-                    </div>
-                  </div>
-
-                  <div className="login-field">
-                    <label>Priority (1 - 100)</label>
-                    <input
-                      type="number"
-                      min={1}
-                      max={100}
-                      value={taskForm.priority}
-                      onChange={(e) => setTaskForm({ ...taskForm, priority: Number(e.target.value) })}
-                      required
-                    />
-                  </div>
-
-                  {taskNotice && (
-                    <p style={{ color: "var(--accent-emerald)", fontSize: "12px", marginBottom: "12px" }}>
-                      {taskNotice}
-                    </p>
-                  )}
-
-                  <button type="submit" className="btn btn-primary" style={{ width: "100%" }}>
-                    Dispatch Move &amp; Run Local Bidding
-                  </button>
-                </form>
-
-                {/* Active Tasks Queue */}
-                <div style={{ borderTop: "1px solid var(--border-tactical)", paddingTop: "16px" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "10px" }}>
-                    <span className="font-mono" style={{ fontSize: "11px", color: "var(--text-muted)" }}>
-                      POSTGRESQL AUDIT QUEUE
-                    </span>
-                    <span className="font-mono" style={{ fontSize: "11px", color: "var(--accent-emerald)" }}>
-                      {tasks.length} RECORDS
-                    </span>
-                  </div>
-
-                  <div style={{ maxHeight: "150px", overflowY: "auto", display: "flex", flexDirection: "column", gap: "6px" }}>
-                    {tasks.length === 0 ? (
-                      <span style={{ fontSize: "12px", color: "var(--text-muted)" }}>No tasks dispatched yet.</span>
-                    ) : (
-                      tasks.slice(0, 4).map((t) => (
-                        <div key={t.id} style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", background: "var(--bg-base)", padding: "6px 8px", borderRadius: "3px" }}>
-                          <span className="font-mono">{t.id}: {t.pickup} &rarr; {t.destination}</span>
-                          <span style={{ color: t.status === "Completed" ? "var(--text-muted)" : "var(--accent-emerald)" }}>
-                            {t.status} ({t.assigned_robot_id ?? "Q"})
-                          </span>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </div>
-
-                <div style={{ marginTop: "20px", display: "flex", justifyContent: "flex-end" }}>
-                  <button className="btn btn-secondary" style={{ fontSize: "11px" }} onClick={() => auth.signOut()}>
-                    Log Out
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
 
       {/* Footer */}
       <footer className="site-footer">

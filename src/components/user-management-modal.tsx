@@ -38,14 +38,9 @@ export function UserManagementModal({ isOpen, onClose }: { isOpen: boolean; onCl
         throw new Error(res.status === 403 ? "Admin privileges required to manage users" : "Failed to load users");
       }
       setUsers(await res.json());
-    } catch {
-      // Graceful offline presentation fallback
-      setUsers([
-        { id: "usr-01", email: "admin@edgefleet.local", roles: ["admin"], active: true, created_at: "2026-09-01T08:00:00Z" },
-        { id: "usr-02", email: "dispatcher@edgefleet.local", roles: ["operator"], active: true, created_at: "2026-09-02T10:30:00Z" },
-        { id: "usr-03", email: "safety.officer@bel.gov.in", roles: ["operator", "fleet-agent"], active: true, created_at: "2026-09-03T14:15:00Z" },
-      ]);
-      setSuccess("Operating in offline presentation mode: 3 cached PostgreSQL operator accounts loaded.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load users from EdgeFleet API");
+      setUsers([]);
     } finally {
       setLoading(false);
     }

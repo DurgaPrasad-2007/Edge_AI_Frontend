@@ -1,5 +1,7 @@
 export type RobotId = "AMR-01" | "AMR-02" | "AMR-03";
 
+export type FleetId = "all" | "alpha" | "beta" | "gamma";
+
 export type Point = { x: number; y: number };
 
 export type RobotState = {
@@ -15,6 +17,50 @@ export type RobotState = {
   progress: number;
   position: Point;
   completed: number;
+  fleet_id?: "alpha" | "beta" | "gamma";
+  robot_class?: string;
+  payload_capacity_kg?: number;
+  max_speed_mps?: number;
+};
+
+export type FleetMetadata = {
+  id: "alpha" | "beta" | "gamma";
+  name: string;
+  role: string;
+  zone: string;
+  color: string;
+  robotCount: number;
+  totalPayloadKg: number;
+};
+
+export const FLEET_PROFILES: Record<"alpha" | "beta" | "gamma", FleetMetadata> = {
+  alpha: {
+    id: "alpha",
+    name: "Fleet Alpha · Heavy Pallet",
+    role: "Heavy Pallet & Bulk Cargo Transport (ISO 3691-4 High Inertia)",
+    zone: "Zone A-02 (High-Bay Staging)",
+    color: "#10B981",
+    robotCount: 2,
+    totalPayloadKg: 2000,
+  },
+  beta: {
+    id: "beta",
+    name: "Fleet Beta · Agile Pickers",
+    role: "Rapid Kitting & Dynamic Aisle Replenishment",
+    zone: "Zone A-02 (Dynamic Racks)",
+    color: "#F59E0B",
+    robotCount: 1,
+    totalPayloadKg: 350,
+  },
+  gamma: {
+    id: "gamma",
+    name: "Fleet Gamma · Inbound Sorters",
+    role: "Autonomous Cross-Dock Tuggers & High-Speed Transit",
+    zone: "Zone B-01 (Inbound Docks)",
+    color: "#38BDF8",
+    robotCount: 1,
+    totalPayloadKg: 800,
+  },
 };
 
 export type FleetEvent = {
@@ -66,13 +112,12 @@ export const initialFleetState: SimulationState = {
   aisle_blocked: false,
   reservation: null,
   lease_until: 0,
-  completed_tasks: 33,
+  completed_tasks: 0,
   collision_count: 0,
-  messages: 142,
+  messages: 0,
   events: [
     { time: "T+00.0s", type: "HEARTBEAT", message: "Mesh online | 3 peers discovered | direct local links healthy" },
-    { time: "T+00.6s", type: "INTENT", message: "AMR-01 broadcast Corridor C-14 traversal intent (ETA 4.2s)" },
-    { time: "T+01.2s", type: "LEASE", message: "Corridor C-14 lease granted to AMR-01 [Utility: 84.2 vs AMR-03: 62.1]" },
+    { time: "T+00.6s", type: "INTENT", message: "Fleet initialized | Peer-to-peer consensus arbitration active" },
   ],
   robots: [
     {
@@ -88,6 +133,10 @@ export const initialFleetState: SimulationState = {
       progress: 0.15,
       position: { x: 140, y: 270 },
       completed: 12,
+      fleet_id: "alpha",
+      robot_class: "Heavy Pallet Lifter",
+      payload_capacity_kg: 1200,
+      max_speed_mps: 1.2,
     },
     {
       id: "AMR-02",
@@ -102,10 +151,14 @@ export const initialFleetState: SimulationState = {
       progress: 0.2,
       position: { x: 500, y: 120 },
       completed: 10,
+      fleet_id: "beta",
+      robot_class: "Agile Tote Picker",
+      payload_capacity_kg: 350,
+      max_speed_mps: 1.8,
     },
     {
       id: "AMR-03",
-      name: "Kiva",
+      name: "Kite",
       color: "#38BDF8",
       battery: 67,
       status: "Yielding",
@@ -116,6 +169,10 @@ export const initialFleetState: SimulationState = {
       progress: 0.1,
       position: { x: 860, y: 453 },
       completed: 11,
+      fleet_id: "alpha",
+      robot_class: "Autonomous Tugger",
+      payload_capacity_kg: 800,
+      max_speed_mps: 1.5,
     },
   ],
 };
