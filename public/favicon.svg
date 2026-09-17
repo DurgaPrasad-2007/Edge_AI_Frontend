@@ -1,0 +1,14 @@
+<svg width="32" height="32" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="edgeAccent" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#2563EB" />
+      <stop offset="100%" stop-color="#1D4ED8" />
+    </linearGradient>
+  </defs>
+  <polygon points="18,2 33,10.5 33,25.5 18,34 3,25.5 3,10.5" stroke="#0F172A" stroke-width="1.8" fill="#FFFFFF" />
+  <path d="M18 4L31 11.5L25 15L18 11L11 15L5 11.5L18 4Z" fill="url(#edgeAccent)" />
+  <path d="M31 13.5V24.5L19 31.5V24.5L25 21L31 13.5Z" fill="#334155" />
+  <path d="M5 13.5L11 21L17 24.5V31.5L5 24.5V13.5Z" fill="#475569" />
+  <circle cx="18" cy="18" r="3.2" fill="#10B981" />
+  <circle cx="18" cy="18" r="5.5" stroke="#10B981" stroke-width="1" stroke-opacity="0.6" stroke-dasharray="2 2" />
+</svg>

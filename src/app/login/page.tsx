@@ -3,7 +3,10 @@
 import { type FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { useAuth, DEFAULT_ADMIN_CREDENTIALS } from "@/components/auth-provider";
+import { useAuth, DEMO_CREDENTIALS_LIST } from "@/components/auth-provider";
+import { EdgeAiLogo } from "@/components/brand/edge-ai-logo";
+import { ThemeToggle } from "@/components/theme-toggle";
+import { playClick, playChirp, playWarning } from "@/lib/sound-effects";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -26,25 +29,38 @@ export default function LoginPage() {
     setSubmitting(true);
     try {
       await signIn(email, password);
+      playChirp();
       router.push("/console");
     } catch (err: unknown) {
+      playWarning();
       setErrorMsg(err instanceof Error ? err.message : "Authentication failed");
     } finally {
       setSubmitting(false);
     }
   };
 
-  const handleQuickFill = () => {
-    setEmail(DEFAULT_ADMIN_CREDENTIALS.email);
-    setPassword(DEFAULT_ADMIN_CREDENTIALS.password);
+  const handleInstantSignIn = async (demoEmail: string, demoPass: string) => {
+    setEmail(demoEmail);
+    setPassword(demoPass);
     setErrorMsg("");
+    setSubmitting(true);
+    try {
+      await signIn(demoEmail, demoPass);
+      playChirp();
+      router.push("/console");
+    } catch (err: unknown) {
+      playWarning();
+      setErrorMsg(err instanceof Error ? err.message : "Authentication failed");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   if (loading) {
     return (
-      <main style={{ minHeight: "100vh", display: "flex", justifyContent: "center", alignItems: "center", background: "#060911" }}>
-        <div style={{ fontFamily: "var(--font-mono)", color: "var(--neon-cyan)", fontSize: "13px", letterSpacing: "0.08em" }}>
-          VERIFYING SESSION CREDENTIALS...
+      <main style={{ minHeight: "100vh", display: "flex", justifyContent: "center", alignItems: "center", backgroundColor: "var(--bg-base)" }}>
+        <div style={{ fontFamily: "var(--font-mono)", color: "var(--text-muted)", fontSize: "13px", letterSpacing: "0.05em" }}>
+          VERIFYING OPERATOR CREDENTIALS...
         </div>
       </main>
     );
@@ -55,92 +71,222 @@ export default function LoginPage() {
       style={{
         minHeight: "100vh",
         display: "flex",
+        flexDirection: "column",
         justifyContent: "center",
         alignItems: "center",
-        padding: "24px",
-        background: "radial-gradient(ellipse at 50% 25%, #0e1a33 0%, #060911 75%)",
+        padding: "32px 20px",
+        backgroundColor: "var(--bg-base)",
+        position: "relative",
       }}
     >
+      {/* Top Header Bar */}
+      <div
+        style={{
+          position: "absolute",
+          top: 16,
+          left: 20,
+          right: 20,
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          maxWidth: 960,
+          margin: "0 auto",
+        }}
+      >
+        <Link
+          href="/"
+          onClick={() => playClick()}
+          style={{
+            fontSize: 13,
+            color: "var(--text-secondary)",
+            textDecoration: "none",
+            fontWeight: 500,
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 6,
+          }}
+        >
+          &larr; Return to Edge AI Overview
+        </Link>
+        <ThemeToggle />
+      </div>
+
+      {/* Center Authentication Card */}
       <div
         style={{
           width: "100%",
-          maxWidth: "460px",
-          padding: "36px 32px",
-          background: "linear-gradient(180deg, rgba(16, 24, 45, 0.95) 0%, rgba(11, 17, 32, 0.98) 100%)",
-          border: "1px solid rgba(56, 189, 248, 0.25)",
-          borderRadius: "8px",
-          boxShadow: "0 12px 40px rgba(0, 0, 0, 0.6), 0 0 1px rgba(56, 189, 248, 0.3)",
-          backdropFilter: "blur(16px)",
-          position: "relative",
+          maxWidth: "480px",
+          padding: "32px 28px",
+          backgroundColor: "var(--bg-surface)",
+          border: "1px solid var(--border-tactical)",
+          borderRadius: "10px",
+          boxShadow: "var(--shadow-elevated)",
+          marginTop: 24,
         }}
       >
-        {/* Brand Header */}
-        <div style={{ display: "flex", alignItems: "center", gap: "14px", marginBottom: "24px" }}>
-          <div
+        {/* Brand & Security Header */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20 }}>
+          <Link href="/" onClick={() => playClick()} style={{ textDecoration: "none" }}>
+            <EdgeAiLogo size={32} />
+          </Link>
+          <span
+            className="mono-tag"
             style={{
-              width: "44px",
-              height: "44px",
-              borderRadius: "6px",
-              background: "linear-gradient(135deg, #38BDF8 0%, #0284C7 100%)",
-              color: "#060911",
-              fontWeight: "900",
-              fontSize: "18px",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontFamily: "var(--font-mono)",
-              boxShadow: "0 4px 14px rgba(56, 189, 248, 0.3)",
+              fontSize: 10,
+              fontWeight: 700,
             }}
           >
-            EF
-          </div>
-          <div>
-            <h1
-              style={{
-                fontSize: "18px",
-                fontWeight: "700",
-                color: "#F8FAFC",
-                fontFamily: "var(--font-sans)",
-                letterSpacing: "-0.01em",
-                margin: 0,
-              }}
-            >
-              EDGEFLEET MISSION CONTROL
-            </h1>
-            <div style={{ fontSize: "11px", fontFamily: "var(--font-mono)", color: "#10B981", marginTop: "3px", display: "flex", alignItems: "center", gap: "6px" }}>
-              <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: "#10B981" }} />
-              OPERATOR ACCESS GATEWAY · ISO 3691-4
-            </div>
-          </div>
+            IEC 62443 // AUTH GATEWAY
+          </span>
         </div>
 
-        <p style={{ fontSize: "12.5px", color: "var(--text-secondary)", lineHeight: 1.55, marginBottom: "22px" }}>
-          Authenticate operator identity to access real-time AMR corridor leases, space-time conflict arbitration, and decentralized task dispatch.
+        <h1
+          style={{
+            fontSize: "20px",
+            fontWeight: 800,
+            color: "var(--text-primary)",
+            letterSpacing: "-0.02em",
+            marginBottom: 6,
+          }}
+        >
+          Operator Mission Control
+        </h1>
+
+        <p style={{ fontSize: "13px", color: "var(--text-secondary)", lineHeight: 1.5, marginBottom: 22 }}>
+          Authenticate to access real-time AMR corridor leases, space-time conflict arbitration, and decentralized task dispatch.
         </p>
+
+        {/* PROMINENT EVALUATOR DEMO CREDENTIALS BOX */}
+        <div
+          style={{
+            backgroundColor: "var(--bg-elevated)",
+            border: "1px solid var(--border-tactical)",
+            borderRadius: "8px",
+            padding: "16px",
+            marginBottom: "22px",
+          }}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+            <span
+              style={{
+                fontSize: "11px",
+                fontWeight: 700,
+                fontFamily: "var(--font-mono)",
+                color: "var(--text-primary)",
+                letterSpacing: "0.04em",
+              }}
+            >
+              SIH-26123 EVALUATOR DEMO ACCESS
+            </span>
+            <span
+              style={{
+                fontSize: "10px",
+                fontWeight: 600,
+                color: "var(--status-nominal)",
+                fontFamily: "var(--font-mono)",
+              }}
+            >
+              PRE-CONFIGURED
+            </span>
+          </div>
+
+          <p style={{ fontSize: "11.5px", color: "var(--text-muted)", margin: "0 0 12px 0", lineHeight: 1.4 }}>
+            Click below to immediately log in with mock evaluation roles or auto-fill credentials:
+          </p>
+
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {DEMO_CREDENTIALS_LIST.map((cred) => (
+              <div
+                key={cred.email}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  padding: "8px 12px",
+                  borderRadius: "6px",
+                  backgroundColor: "var(--bg-surface)",
+                  border: "1px solid var(--border-subtle)",
+                  fontSize: "12px",
+                  gap: 10,
+                }}
+              >
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <strong style={{ color: "var(--text-primary)", fontSize: "12px" }}>{cred.role}</strong>
+                    <span className="mono-tag" style={{ fontSize: "9px", padding: "1px 4px" }}>
+                      {cred.badge}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: "11px", color: "var(--text-muted)", fontFamily: "var(--font-mono)", textOverflow: "ellipsis", overflow: "hidden", whiteSpace: "nowrap" }}>
+                    {cred.email}
+                  </div>
+                </div>
+
+                <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      playClick();
+                      setEmail(cred.email);
+                      setPassword(cred.password);
+                      setErrorMsg("");
+                    }}
+                    className="btn btn-secondary"
+                    style={{ padding: "4px 8px", fontSize: "11px" }}
+                    title="Fill form inputs"
+                  >
+                    Fill
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleInstantSignIn(cred.email, cred.password)}
+                    className="btn btn-primary"
+                    style={{ padding: "4px 10px", fontSize: "11px" }}
+                    title="Sign in instantly"
+                  >
+                    1-Click Sign In
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
 
         {errorMsg && (
           <div
             style={{
               padding: "10px 14px",
-              background: "rgba(239, 68, 68, 0.12)",
-              border: "1px solid rgba(239, 68, 68, 0.35)",
-              borderRadius: "4px",
-              color: "#FCA5A5",
+              backgroundColor: "var(--status-danger-tint)",
+              border: "1px solid var(--status-danger-border)",
+              borderRadius: "6px",
+              color: "var(--status-danger)",
               fontSize: "12px",
               fontFamily: "var(--font-mono)",
               marginBottom: "18px",
             }}
           >
-            <b>SECURITY ERROR:</b> {errorMsg}
+            <strong>AUTHENTICATION NOTICE:</strong> {errorMsg}
           </div>
         )}
 
+        {/* Manual Login Form */}
         <form onSubmit={handleSubmit} style={{ display: "grid", gap: "16px" }}>
           <div>
-            <label style={{ display: "block", fontSize: "11px", fontWeight: "600", color: "#94A3B8", fontFamily: "var(--font-mono)", marginBottom: "6px" }}>
+            <label
+              htmlFor="login-email"
+              style={{
+                display: "block",
+                fontSize: "11.5px",
+                fontWeight: 600,
+                color: "var(--text-secondary)",
+                fontFamily: "var(--font-mono)",
+                marginBottom: "6px",
+              }}
+            >
               OPERATOR IDENTITY (EMAIL)
             </label>
             <input
+              id="login-email"
               type="email"
               required
               value={email}
@@ -148,116 +294,75 @@ export default function LoginPage() {
               onChange={(e) => setEmail(e.target.value)}
               style={{
                 width: "100%",
-                padding: "10px 14px",
+                padding: "10px 12px",
                 fontSize: "13.5px",
-                color: "#F8FAFC",
-                background: "rgba(6, 9, 17, 0.7)",
-                border: "1px solid rgba(255, 255, 255, 0.12)",
-                borderRadius: "4px",
+                color: "var(--text-primary)",
+                backgroundColor: "var(--bg-elevated)",
+                border: "1px solid var(--border-tactical)",
+                borderRadius: "6px",
                 outline: "none",
-                transition: "border-color 0.2s",
+                transition: "border-color 0.15s ease",
               }}
-              onFocus={(e) => (e.target.style.borderColor = "#38BDF8")}
-              onBlur={(e) => (e.target.style.borderColor = "rgba(255, 255, 255, 0.12)")}
             />
           </div>
 
           <div>
-            <label style={{ display: "block", fontSize: "11px", fontWeight: "600", color: "#94A3B8", fontFamily: "var(--font-mono)", marginBottom: "6px" }}>
+            <label
+              htmlFor="login-password"
+              style={{
+                display: "block",
+                fontSize: "11.5px",
+                fontWeight: 600,
+                color: "var(--text-secondary)",
+                fontFamily: "var(--font-mono)",
+                marginBottom: "6px",
+              }}
+            >
               SECURITY KEY / PASSWORD
             </label>
             <input
+              id="login-password"
               type="password"
               required
               value={password}
-              placeholder="Enter password"
+              placeholder="Enter password or use 1-click above"
               onChange={(e) => setPassword(e.target.value)}
               style={{
                 width: "100%",
-                padding: "10px 14px",
+                padding: "10px 12px",
                 fontSize: "13.5px",
-                color: "#F8FAFC",
-                background: "rgba(6, 9, 17, 0.7)",
-                border: "1px solid rgba(255, 255, 255, 0.12)",
-                borderRadius: "4px",
+                color: "var(--text-primary)",
+                backgroundColor: "var(--bg-elevated)",
+                border: "1px solid var(--border-tactical)",
+                borderRadius: "6px",
                 outline: "none",
-                transition: "border-color 0.2s",
+                transition: "border-color 0.15s ease",
               }}
-              onFocus={(e) => (e.target.style.borderColor = "#38BDF8")}
-              onBlur={(e) => (e.target.style.borderColor = "rgba(255, 255, 255, 0.12)")}
             />
           </div>
 
-          <div style={{ marginTop: "6px" }}>
+          <div style={{ marginTop: "4px" }}>
             <button
               type="submit"
               disabled={submitting}
+              className="btn btn-primary"
               style={{
                 width: "100%",
-                padding: "12px",
-                fontSize: "12.5px",
-                fontFamily: "var(--font-mono)",
-                letterSpacing: "0.04em",
-                fontWeight: "700",
-                color: "#060911",
-                background: "linear-gradient(135deg, #38BDF8 0%, #0284C7 100%)",
-                border: "none",
-                borderRadius: "4px",
-                cursor: submitting ? "not-allowed" : "pointer",
-                boxShadow: "0 4px 14px rgba(56, 189, 248, 0.3)",
-                transition: "transform 0.15s ease, box-shadow 0.15s ease",
+                padding: "11px",
+                fontSize: "13px",
+                fontWeight: 700,
+                letterSpacing: "0.02em",
               }}
-              onMouseEnter={(e) => (e.currentTarget.style.transform = "translateY(-1px)")}
-              onMouseLeave={(e) => (e.currentTarget.style.transform = "none")}
             >
-              {submitting ? "VERIFYING CREDENTIALS..." : "AUTHENTICATE & ENTER CONSOLE"}
+              {submitting ? "VERIFYING CREDENTIALS..." : "Authenticate & Enter Console \u2192"}
             </button>
           </div>
         </form>
 
-        {/* Quick Helper Button */}
-        <div style={{ marginTop: "20px", paddingTop: "16px", borderTop: "1px solid rgba(255, 255, 255, 0.08)" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <span style={{ fontSize: "11px", color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>
-              EVALUATION ACCESS:
-            </span>
-            <button
-              type="button"
-              onClick={handleQuickFill}
-              style={{
-                background: "rgba(56, 189, 248, 0.08)",
-                border: "1px solid rgba(56, 189, 248, 0.3)",
-                color: "#38BDF8",
-                fontSize: "11px",
-                fontFamily: "var(--font-mono)",
-                padding: "4px 10px",
-                borderRadius: "4px",
-                cursor: "pointer",
-                transition: "background 0.2s ease",
-              }}
-              onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(56, 189, 248, 0.18)")}
-              onMouseLeave={(e) => (e.currentTarget.style.background = "rgba(56, 189, 248, 0.08)")}
-            >
-              Quick-Fill Default Admin
-            </button>
-          </div>
-        </div>
-
-        <div style={{ marginTop: "22px", textAlign: "center" }}>
-          <Link
-            href="/"
-            style={{
-              color: "var(--text-secondary)",
-              fontSize: "12px",
-              textDecoration: "none",
-              fontFamily: "var(--font-mono)",
-              transition: "color 0.15s ease",
-            }}
-            onMouseEnter={(e) => (e.currentTarget.style.color = "#F8FAFC")}
-            onMouseLeave={(e) => (e.currentTarget.style.color = "var(--text-secondary)")}
-          >
-            &larr; Return to Enterprise Overview
-          </Link>
+        <div style={{ marginTop: "24px", paddingTop: "16px", borderTop: "1px solid var(--border-subtle)", textAlign: "center" }}>
+          <span style={{ fontSize: "11px", color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>
+            Zero-Motion API Observer Guarantee &bull; ROS 2 / Zenoh Mesh Bridge
+          </span>
         </div>
       </div>
     </main>

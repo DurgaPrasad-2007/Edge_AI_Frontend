@@ -11,6 +11,8 @@ import {
 } from "@/lib/fleet-contract";
 import { useAuth } from "@/components/auth-provider";
 import { UserManagementModal } from "@/components/user-management-modal";
+import { useTheme } from "@/components/theme-provider";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 const apiBase = process.env.NEXT_PUBLIC_EDGE_API_BASE_URL ?? "http://localhost:8000";
 
@@ -642,6 +644,8 @@ const INITIAL_JOBS: WarehouseJob[] = [
 export function FleetDashboard() {
   const router = useRouter();
   const { user, signOut } = useAuth();
+  const { theme } = useTheme();
+  const isLight = theme === "light";
 
   // Navigation & View Mode
   const [activeBuildingId, setActiveBuildingId] = useState<string>("dc-west");
@@ -1066,14 +1070,25 @@ export function FleetDashboard() {
   };
 
   return (
-    <div className="console-layout" style={{ minHeight: "100vh", background: "#040814", color: "#F8FAFC" }}>
+    <div
+      className="console-layout"
+      style={{
+        minHeight: "100vh",
+        background: "var(--bg-base)",
+        color: "var(--text-primary)",
+        transition: "background-color 0.2s ease, color 0.2s ease",
+      }}
+    >
       {/* ====================================================================
           TOP OPERATIONAL CONTROL BAR (CLEAN & NON-INTRUSIVE)
           ==================================================================== */}
       <header
         style={{
-          background: "rgba(6, 12, 26, 0.95)",
-          borderBottom: "1px solid rgba(56, 189, 248, 0.2)",
+          background: isLight ? "rgba(255, 255, 255, 0.92)" : "rgba(6, 12, 26, 0.95)",
+          backdropFilter: "blur(12px)",
+          WebkitBackdropFilter: "blur(12px)",
+          borderBottom: "1px solid var(--border-tactical)",
+          boxShadow: isLight ? "0 2px 10px rgba(0,0,0,0.04)" : "0 4px 20px rgba(0,0,0,0.4)",
           padding: "10px 20px",
           display: "flex",
           justifyContent: "space-between",
@@ -1083,6 +1098,7 @@ export function FleetDashboard() {
           position: "sticky",
           top: 0,
           zIndex: 40,
+          transition: "background-color 0.2s ease, border-color 0.2s ease",
         }}
       >
         {/* Left: Brand + Building Map Selector */}
@@ -1108,7 +1124,7 @@ export function FleetDashboard() {
               className="building-select-pill"
             >
               {Object.values(BUILDING_MAPS).map((b) => (
-                <option key={b.id} value={b.id} style={{ background: "#060D1E", color: "#F8FAFC" }}>
+                <option key={b.id} value={b.id}>
                   {b.name} ({b.code})
                 </option>
               ))}
@@ -1213,6 +1229,23 @@ export function FleetDashboard() {
             <span>BEL Audit</span>
           </button>
 
+          {/* Website Theme Toggle (Light / Dark) */}
+          <ThemeToggle />
+
+          {/* User Profile / RBAC Trigger */}
+          {user && (
+            <button
+              type="button"
+              className="cyber-btn"
+              onClick={() => setShowUserModal(true)}
+              style={{ fontSize: "10.5px", padding: "5px 10px", color: "var(--text-primary)" }}
+              title="Manage Operators & RBAC"
+            >
+              <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#10B981", display: "inline-block", marginRight: 4 }} />
+              <span>{user.email.split("@")[0]}</span>
+            </button>
+          )}
+
           <button
             type="button"
             className="cyber-btn"
@@ -1232,14 +1265,24 @@ export function FleetDashboard() {
             LEFT COLUMN: INTERACTIVE DIGITAL TWIN FLOOR PLAN
             ================================================================== */}
         <section style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-          <div className="cyber-panel" style={{ padding: "16px", borderRadius: "8px", background: "linear-gradient(180deg, #070D1D 0%, #030611 100%)" }}>
+          <div
+            className="cyber-panel"
+            style={{
+              padding: "16px",
+              borderRadius: "10px",
+              background: "var(--bg-surface)",
+              border: "1px solid var(--border-tactical)",
+              boxShadow: "var(--shadow-card)",
+              transition: "background-color 0.2s ease, border-color 0.2s ease",
+            }}
+          >
             {/* Floor Header & View Switcher */}
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px", flexWrap: "wrap", gap: "8px" }}>
               <div>
-                <span style={{ fontSize: "13px", fontWeight: "800", color: "#F8FAFC", fontFamily: "var(--font-orbitron)" }}>
+                <span style={{ fontSize: "13px", fontWeight: "800", color: "var(--text-primary)", fontFamily: "var(--font-orbitron)" }}>
                   {activeBuilding.name.toUpperCase()}
                 </span>
-                <span style={{ fontSize: "10.5px", color: "#94A3B8", fontFamily: "var(--font-mono)", marginLeft: "8px" }}>
+                <span style={{ fontSize: "10.5px", color: "var(--text-muted)", fontFamily: "var(--font-mono)", marginLeft: "8px" }}>
                   [{activeBuilding.description}]
                 </span>
               </div>
@@ -1277,22 +1320,44 @@ export function FleetDashboard() {
             <div className={`isometric-deck ${perspectiveMode === "iso" ? "perspective-3d" : "perspective-flat"}`}>
               <svg
                 viewBox="0 0 1000 640"
-                style={{ width: "100%", height: "auto", display: "block", background: "#02050E", borderRadius: "6px", border: "1px solid rgba(56, 189, 248, 0.2)" }}
+                style={{
+                  width: "100%",
+                  height: "auto",
+                  display: "block",
+                  background: isLight ? "#F1F5F9" : "#02050E",
+                  borderRadius: "8px",
+                  border: "1px solid var(--border-tactical)",
+                  transition: "background-color 0.2s ease",
+                }}
               >
                 <defs>
                   <pattern id="grid-pattern-clean" width="30" height="30" patternUnits="userSpaceOnUse">
-                    <path d="M 30 0 L 0 0 0 30" fill="none" stroke="rgba(56, 189, 248, 0.05)" strokeWidth="0.8" />
-                    <circle cx="0" cy="0" r="1" fill="rgba(56, 189, 248, 0.15)" />
+                    <path
+                      d="M 30 0 L 0 0 0 30"
+                      fill="none"
+                      stroke={isLight ? "rgba(148, 163, 184, 0.2)" : "rgba(56, 189, 248, 0.05)"}
+                      strokeWidth="0.8"
+                    />
+                    <circle cx="0" cy="0" r="1" fill={isLight ? "rgba(148, 163, 184, 0.4)" : "rgba(56, 189, 248, 0.15)"} />
                   </pattern>
                   <pattern id="hazard-stripes" width="12" height="12" patternTransform="rotate(45 0 0)" patternUnits="userSpaceOnUse">
                     <line x1="0" y1="0" x2="0" y2="12" stroke="#EF4444" strokeWidth="4" />
-                    <line x1="6" y1="0" x2="6" y2="12" stroke="#450a0a" strokeWidth="8" />
+                    <line x1="6" y1="0" x2="6" y2="12" stroke={isLight ? "#FCA5A5" : "#450a0a"} strokeWidth="8" />
                   </pattern>
                 </defs>
 
                 {/* Base Background & Subtle Grid */}
-                <rect width="1000" height="640" fill="#020612" />
-                <rect x="15" y="15" width="970" height="610" fill="url(#grid-pattern-clean)" stroke="rgba(56, 189, 248, 0.2)" strokeWidth="1" rx="6" />
+                <rect width="1000" height="640" fill={isLight ? "#F8FAFC" : "#020612"} />
+                <rect
+                  x="15"
+                  y="15"
+                  width="970"
+                  height="610"
+                  fill="url(#grid-pattern-clean)"
+                  stroke={isLight ? "rgba(203, 213, 225, 0.8)" : "rgba(56, 189, 248, 0.2)"}
+                  strokeWidth="1"
+                  rx="6"
+                />
 
                 {/* ==========================================================
                     1. INDUSTRIAL AGV HIGHWAY NETWORK (LANES & CENTERLINES)
@@ -1378,25 +1443,25 @@ export function FleetDashboard() {
                       width={r.w}
                       height={r.h}
                       rx="4"
-                      fill="#060e22"
-                      stroke="rgba(56, 189, 248, 0.45)"
+                      fill={isLight ? "#FFFFFF" : "#060e22"}
+                      stroke={isLight ? "rgba(2, 132, 199, 0.45)" : "rgba(56, 189, 248, 0.45)"}
                       strokeWidth="1.2"
-                      style={{ filter: "drop-shadow(0 2px 8px rgba(0,0,0,0.5))" }}
+                      style={{ filter: isLight ? "drop-shadow(0 2px 4px rgba(0,0,0,0.06))" : "drop-shadow(0 2px 8px rgba(0,0,0,0.5))" }}
                     />
                     {/* 3 Internal Pallet Storage Slots */}
-                    <line x1={r.w / 3} y1="3" x2={r.w / 3} y2={r.h - 3} stroke="rgba(56, 189, 248, 0.15)" strokeWidth="1" strokeDasharray="2 2" />
-                    <line x1={(2 * r.w) / 3} y1="3" x2={(2 * r.w) / 3} y2={r.h - 3} stroke="rgba(56, 189, 248, 0.15)" strokeWidth="1" strokeDasharray="2 2" />
+                    <line x1={r.w / 3} y1="3" x2={r.w / 3} y2={r.h - 3} stroke={isLight ? "rgba(148, 163, 184, 0.4)" : "rgba(56, 189, 248, 0.15)"} strokeWidth="1" strokeDasharray="2 2" />
+                    <line x1={(2 * r.w) / 3} y1="3" x2={(2 * r.w) / 3} y2={r.h - 3} stroke={isLight ? "rgba(148, 163, 184, 0.4)" : "rgba(56, 189, 248, 0.15)"} strokeWidth="1" strokeDasharray="2 2" />
 
                     {/* Pallet Slot Boxes */}
-                    <rect x="4" y="24" width={r.w / 3 - 8} height="18" rx="2" fill="rgba(56, 189, 248, 0.06)" stroke="rgba(56, 189, 248, 0.15)" strokeWidth="0.5" />
-                    <rect x={r.w / 3 + 4} y="24" width={r.w / 3 - 8} height="18" rx="2" fill="rgba(56, 189, 248, 0.06)" stroke="rgba(56, 189, 248, 0.15)" strokeWidth="0.5" />
-                    <rect x={(2 * r.w) / 3 + 4} y="24" width={r.w / 3 - 8} height="18" rx="2" fill="rgba(56, 189, 248, 0.06)" stroke="rgba(56, 189, 248, 0.15)" strokeWidth="0.5" />
+                    <rect x="4" y="24" width={r.w / 3 - 8} height="18" rx="2" fill={isLight ? "rgba(2, 132, 199, 0.06)" : "rgba(56, 189, 248, 0.06)"} stroke={isLight ? "rgba(2, 132, 199, 0.2)" : "rgba(56, 189, 248, 0.15)"} strokeWidth="0.5" />
+                    <rect x={r.w / 3 + 4} y="24" width={r.w / 3 - 8} height="18" rx="2" fill={isLight ? "rgba(2, 132, 199, 0.06)" : "rgba(56, 189, 248, 0.06)"} stroke={isLight ? "rgba(2, 132, 199, 0.2)" : "rgba(56, 189, 248, 0.15)"} strokeWidth="0.5" />
+                    <rect x={(2 * r.w) / 3 + 4} y="24" width={r.w / 3 - 8} height="18" rx="2" fill={isLight ? "rgba(2, 132, 199, 0.06)" : "rgba(56, 189, 248, 0.06)"} stroke={isLight ? "rgba(2, 132, 199, 0.2)" : "rgba(56, 189, 248, 0.15)"} strokeWidth="0.5" />
 
                     {/* Rack Label & Category */}
-                    <text x={r.w / 2} y="15" textAnchor="middle" fill="#F1F5F9" fontSize="9" fontWeight="800" fontFamily="var(--font-orbitron)" letterSpacing="0.04em">
+                    <text x={r.w / 2} y="15" textAnchor="middle" fill={isLight ? "#0F172A" : "#F1F5F9"} fontSize="9" fontWeight="800" fontFamily="var(--font-orbitron)" letterSpacing="0.04em">
                       {r.label.split(" [")[0]}
                     </text>
-                    <text x={r.w / 2} y="36" textAnchor="middle" fill="#38BDF8" fontSize="7.5" fontWeight="700" fontFamily="var(--font-mono)">
+                    <text x={r.w / 2} y="36" textAnchor="middle" fill={isLight ? "#0284C7" : "#38BDF8"} fontSize="7.5" fontWeight="700" fontFamily="var(--font-mono)">
                       [{r.category.toUpperCase()}]
                     </text>
                   </g>
@@ -1413,11 +1478,11 @@ export function FleetDashboard() {
                       width="130"
                       height="32"
                       rx="5"
-                      fill={d.type === "charge" ? "rgba(16, 185, 129, 0.12)" : "rgba(56, 189, 248, 0.1)"}
-                      stroke={d.type === "charge" ? "#10B981" : "#38BDF8"}
+                      fill={d.type === "charge" ? (isLight ? "rgba(5, 150, 105, 0.1)" : "rgba(16, 185, 129, 0.12)") : (isLight ? "rgba(2, 132, 199, 0.08)" : "rgba(56, 189, 248, 0.1)")}
+                      stroke={d.type === "charge" ? (isLight ? "#059669" : "#10B981") : (isLight ? "#0284C7" : "#38BDF8")}
                       strokeWidth="1.5"
                     />
-                    <text x="0" y="4" textAnchor="middle" fill={d.type === "charge" ? "#10B981" : "#38BDF8"} fontSize="8.5" fontWeight="800" fontFamily="var(--font-mono)">
+                    <text x="0" y="4" textAnchor="middle" fill={d.type === "charge" ? (isLight ? "#059669" : "#10B981") : (isLight ? "#0284C7" : "#38BDF8")} fontSize="8.5" fontWeight="800" fontFamily="var(--font-mono)">
                       {d.label}
                     </text>
                   </g>
@@ -1432,16 +1497,16 @@ export function FleetDashboard() {
                     width={activeBuilding.corridor.w}
                     height={activeBuilding.corridor.h}
                     rx="4"
-                    fill={reservation ? "rgba(16, 185, 129, 0.12)" : "rgba(245, 158, 11, 0.08)"}
-                    stroke={reservation ? "#10B981" : "#F59E0B"}
+                    fill={reservation ? (isLight ? "rgba(5, 150, 105, 0.1)" : "rgba(16, 185, 129, 0.12)") : (isLight ? "rgba(217, 119, 6, 0.08)" : "rgba(245, 158, 11, 0.08)")}
+                    stroke={reservation ? (isLight ? "#059669" : "#10B981") : (isLight ? "#D97706" : "#F59E0B")}
                     strokeWidth="1.8"
                     strokeDasharray={reservation ? "none" : "4 4"}
                   />
                   {/* Transit Direction Chevrons */}
-                  <text x={activeBuilding.corridor.w / 2} y={activeBuilding.corridor.h / 2 - 5} textAnchor="middle" fill="#F8FAFC" fontSize="9.5" fontWeight="800" fontFamily="var(--font-orbitron)">
+                  <text x={activeBuilding.corridor.w / 2} y={activeBuilding.corridor.h / 2 - 5} textAnchor="middle" fill={isLight ? "#0F172A" : "#F8FAFC"} fontSize="9.5" fontWeight="800" fontFamily="var(--font-orbitron)">
                     {activeBuilding.corridor.label}
                   </text>
-                  <text x={activeBuilding.corridor.w / 2} y={activeBuilding.corridor.h / 2 + 10} textAnchor="middle" fill={reservation ? "#10B981" : "#F59E0B"} fontSize="8" fontWeight="800" fontFamily="var(--font-mono)">
+                  <text x={activeBuilding.corridor.w / 2} y={activeBuilding.corridor.h / 2 + 10} textAnchor="middle" fill={reservation ? (isLight ? "#059669" : "#10B981") : (isLight ? "#D97706" : "#F59E0B")} fontSize="8" fontWeight="800" fontFamily="var(--font-mono)">
                     {reservation ? `★ LEASE HOLDER: ${reservation}` : "● P2P SPACE-TIME MUTEX AVAILABLE"}
                   </text>
                 </g>
@@ -1668,18 +1733,32 @@ export function FleetDashboard() {
             </div>
 
             {/* Live Movement & Telemetry Bar */}
-            <div style={{ padding: "8px 12px", background: "rgba(6, 12, 26, 0.9)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "6px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "8px", marginTop: "10px" }}>
+            <div
+              style={{
+                padding: "8px 12px",
+                background: "var(--bg-elevated)",
+                border: "1px solid var(--border-tactical)",
+                borderRadius: "6px",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                flexWrap: "wrap",
+                gap: "8px",
+                marginTop: "10px",
+                transition: "background-color 0.2s ease, border-color 0.2s ease",
+              }}
+            >
               <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap", fontSize: "10.5px", fontFamily: "var(--font-mono)" }}>
                 <span style={{ color: "var(--text-muted)", fontWeight: "700" }}>LIVE MONITOR:</span>
                 {Object.values(workers).map((w) => (
                   <span key={w.id} style={{ color: w.color, display: "inline-flex", alignItems: "center", gap: "4px" }}>
                     <span>● {w.id}:</span>
-                    <span style={{ color: "#F8FAFC" }}>{w.status}</span>
+                    <span style={{ color: "var(--text-primary)" }}>{w.status}</span>
                     <span style={{ color: "var(--text-muted)" }}>({Math.round(w.position.x)}, {Math.round(w.position.y)})</span>
                   </span>
                 ))}
               </div>
-              <div style={{ fontSize: "10px", color: "#10B981", fontFamily: "var(--font-mono)" }}>
+              <div style={{ fontSize: "10px", color: "var(--status-nominal)", fontWeight: "700", fontFamily: "var(--font-mono)" }}>
                 ● ZENOH P2P MESH ACTIVE · ISO 3691-4 SAFE
               </div>
             </div>
@@ -1723,8 +1802,8 @@ export function FleetDashboard() {
             <div className="cyber-panel" style={{ padding: "16px", borderRadius: "8px", display: "flex", flexDirection: "column", gap: "12px" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <div>
-                  <h4 style={{ fontSize: "13px", fontWeight: "700", color: "#F8FAFC" }}>Active Warehouse Workload</h4>
-                  <span style={{ fontSize: "10.5px", color: "#94A3B8", fontFamily: "var(--font-mono)" }}>
+                  <h4 style={{ fontSize: "13px", fontWeight: "700", color: "var(--text-primary)" }}>Active Warehouse Workload</h4>
+                  <span style={{ fontSize: "10.5px", color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>
                     Continuous Decentralized Task Auction (Contract-Net)
                   </span>
                 </div>
@@ -1746,14 +1825,14 @@ export function FleetDashboard() {
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
                       <div>
                         <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
-                          <span style={{ fontSize: "10px", fontFamily: "var(--font-mono)", fontWeight: "800", color: "#38BDF8", background: "rgba(56, 189, 248, 0.1)", padding: "1px 6px", borderRadius: "3px" }}>
+                          <span style={{ fontSize: "10px", fontFamily: "var(--font-mono)", fontWeight: "800", color: "var(--border-focus)", background: "var(--accent-cobalt-dim)", padding: "1px 6px", borderRadius: "3px" }}>
                             #{job.id}
                           </span>
-                          <span style={{ fontSize: "12px", fontWeight: "700", color: "#F8FAFC" }}>
+                          <span style={{ fontSize: "12px", fontWeight: "700", color: "var(--text-primary)" }}>
                             {job.title}
                           </span>
                         </div>
-                        <div style={{ fontSize: "10.5px", color: "#94A3B8", fontFamily: "var(--font-mono)" }}>
+                        <div style={{ fontSize: "10.5px", color: "var(--text-secondary)", fontFamily: "var(--font-mono)" }}>
                           {job.source} ➔ {job.destination}
                         </div>
                       </div>
@@ -1766,8 +1845,8 @@ export function FleetDashboard() {
                             fontWeight: "700",
                             padding: "2px 6px",
                             borderRadius: "3px",
-                            background: job.status === "COMPLETED" ? "rgba(16, 185, 129, 0.15)" : job.status === "IN_TRANSIT" ? "rgba(56, 189, 248, 0.15)" : "rgba(245, 158, 11, 0.15)",
-                            color: job.status === "COMPLETED" ? "#10B981" : job.status === "IN_TRANSIT" ? "#38BDF8" : "#F59E0B",
+                            background: job.status === "COMPLETED" ? "var(--status-nominal-tint)" : job.status === "IN_TRANSIT" ? "var(--status-active-tint)" : "var(--status-warning-tint)",
+                            color: job.status === "COMPLETED" ? "var(--status-nominal)" : job.status === "IN_TRANSIT" ? "var(--status-active)" : "var(--status-warning)",
                           }}
                         >
                           {job.status}
@@ -1784,14 +1863,14 @@ export function FleetDashboard() {
                         className="job-progress-fill"
                         style={{
                           width: `${job.progress}%`,
-                          backgroundColor: job.status === "COMPLETED" ? "#10B981" : "#38BDF8",
+                          backgroundColor: job.status === "COMPLETED" ? "var(--status-nominal)" : "var(--status-active)",
                         }}
                       />
                     </div>
 
                     {/* Agent Capacity & Workload Check */}
-                    <div style={{ padding: "6px 8px", background: "rgba(0,0,0,0.3)", borderRadius: "4px", border: "1px solid rgba(255,255,255,0.05)", margin: "4px 0" }}>
-                      <div style={{ fontSize: "9px", color: "#94A3B8", fontFamily: "var(--font-mono)", marginBottom: "4px" }}>
+                    <div style={{ padding: "6px 8px", background: "var(--bg-elevated)", borderRadius: "4px", border: "1px solid var(--border-subtle)", margin: "4px 0" }}>
+                      <div style={{ fontSize: "9px", color: "var(--text-muted)", fontFamily: "var(--font-mono)", marginBottom: "4px" }}>
                         AMR CAPACITY CHECK (Required: {job.payloadKg}kg):
                       </div>
                       <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
@@ -1806,9 +1885,9 @@ export function FleetDashboard() {
                                 fontFamily: "var(--font-mono)",
                                 padding: "2px 5px",
                                 borderRadius: "3px",
-                                background: !isEligible ? "rgba(239, 68, 68, 0.12)" : isBusy ? "rgba(245, 158, 11, 0.12)" : "rgba(16, 185, 129, 0.12)",
-                                color: !isEligible ? "#EF4444" : isBusy ? "#F59E0B" : "#10B981",
-                                border: `1px solid ${!isEligible ? "rgba(239, 68, 68, 0.25)" : isBusy ? "rgba(245, 158, 11, 0.25)" : "rgba(16, 185, 129, 0.25)"}`,
+                                background: !isEligible ? "var(--status-danger-tint)" : isBusy ? "var(--status-warning-tint)" : "var(--status-nominal-tint)",
+                                color: !isEligible ? "var(--status-danger)" : isBusy ? "var(--status-warning)" : "var(--status-nominal)",
+                                border: `1px solid ${!isEligible ? "var(--status-danger-border)" : isBusy ? "rgba(245, 158, 11, 0.3)" : "rgba(16, 185, 129, 0.3)"}`,
                               }}
                             >
                               {w.id} ({w.maxPayloadKg}kg): {!isEligible ? "✗ Under-Cap" : isBusy ? "⏳ Busy" : "✓ Ready"}
@@ -1820,7 +1899,7 @@ export function FleetDashboard() {
 
                     {/* Action Bar */}
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingTop: "4px" }}>
-                      <span style={{ fontSize: "10px", fontFamily: "var(--font-mono)", color: job.assignedAmr ? "#38BDF8" : "#64748B" }}>
+                      <span style={{ fontSize: "10px", fontFamily: "var(--font-mono)", color: job.assignedAmr ? "var(--status-active)" : "var(--text-muted)" }}>
                         {job.assignedAmr ? `Assigned to: ${job.assignedAmr} (${workers[job.assignedAmr]?.name})` : "Unassigned · Ready for P2P Auction"}
                       </span>
 
@@ -1846,7 +1925,8 @@ export function FleetDashboard() {
                               }
                             }}
                             defaultValue=""
-                            style={{ background: "#060D1E", border: "1px solid rgba(255,255,255,0.15)", color: "#CBD5E1", fontSize: "10px", padding: "2px 6px", borderRadius: "4px" }}
+                            className="console-select"
+                            style={{ fontSize: "10px", padding: "2px 6px" }}
                           >
                             <option value="" disabled>Assign AMR</option>
                             {Object.values(workers).map((w) => (
@@ -1868,8 +1948,8 @@ export function FleetDashboard() {
               {/* Header with Deploy Button */}
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <div>
-                  <h4 style={{ fontSize: "13px", fontWeight: "700", color: "#F8FAFC" }}>Fleet Worker Units</h4>
-                  <span style={{ fontSize: "10.5px", color: "#94A3B8", fontFamily: "var(--font-mono)" }}>
+                  <h4 style={{ fontSize: "13px", fontWeight: "700", color: "var(--text-primary)" }}>Fleet Worker Units</h4>
+                  <span style={{ fontSize: "10.5px", color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>
                     Configure hardware, location, area &amp; staff pre-training
                   </span>
                 </div>
@@ -1901,17 +1981,17 @@ export function FleetDashboard() {
               </div>
 
               {/* Selected AMR Attributes Form */}
-              <div style={{ background: "rgba(10, 16, 32, 0.9)", border: "1px solid rgba(56, 189, 248, 0.2)", borderRadius: "6px", padding: "14px", display: "flex", flexDirection: "column", gap: "10px" }}>
+              <div style={{ background: "var(--bg-elevated)", border: "1px solid var(--border-tactical)", borderRadius: "6px", padding: "14px", display: "flex", flexDirection: "column", gap: "10px" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   <div>
-                    <h4 style={{ fontSize: "14px", fontWeight: "800", color: "#F8FAFC", fontFamily: "var(--font-orbitron)" }}>
+                    <h4 style={{ fontSize: "14px", fontWeight: "800", color: "var(--text-primary)", fontFamily: "var(--font-orbitron)" }}>
                       {selectedWorker.id} · {selectedWorker.name}
                     </h4>
-                    <span style={{ fontSize: "10.5px", color: "#38BDF8", fontFamily: "var(--font-mono)" }}>
+                    <span style={{ fontSize: "10.5px", color: "var(--border-focus)", fontFamily: "var(--font-mono)" }}>
                       {selectedWorker.hardware}
                     </span>
                   </div>
-                  <span style={{ fontSize: "10px", padding: "2px 8px", borderRadius: "3px", background: "rgba(16, 185, 129, 0.15)", color: "#10B981", fontWeight: "700", fontFamily: "var(--font-mono)" }}>
+                  <span style={{ fontSize: "10px", padding: "2px 8px", borderRadius: "3px", background: "var(--status-nominal-tint)", color: "var(--status-nominal)", fontWeight: "700", fontFamily: "var(--font-mono)" }}>
                     STATUS: {selectedWorker.status}
                   </span>
                 </div>
@@ -1922,7 +2002,8 @@ export function FleetDashboard() {
                   <select
                     value={selectedWorker.role}
                     onChange={(e) => updateWorkerAttr(selectedAmrId, "role", e.target.value as AmrRole)}
-                    style={{ background: "#060D1E", border: "1px solid rgba(56, 189, 248, 0.3)", color: "#F8FAFC", fontSize: "11px", padding: "4px 8px", borderRadius: "4px", gridColumn: "span 2" }}
+                    className="console-select"
+                    style={{ gridColumn: "span 2" }}
                   >
                     <option value="Heavy Pallet Lifter">Heavy Pallet Lifter (High Inertia · 1200kg)</option>
                     <option value="Agile Tote Picker">Agile Tote Picker (Rapid Kitting · 350kg)</option>
@@ -1937,7 +2018,8 @@ export function FleetDashboard() {
                   <select
                     value={selectedWorker.location}
                     onChange={(e) => setAmrSpawnBay(selectedAmrId, e.target.value as AmrLocation)}
-                    style={{ background: "#060D1E", border: "1px solid rgba(56, 189, 248, 0.3)", color: "#F8FAFC", fontSize: "11px", padding: "4px 8px", borderRadius: "4px", gridColumn: "span 2" }}
+                    className="console-select"
+                    style={{ gridColumn: "span 2" }}
                   >
                     <option value="Dock East">Dock East (Inbound Staging)</option>
                     <option value="Dock West">Dock West (Outbound Staging)</option>
@@ -1953,7 +2035,8 @@ export function FleetDashboard() {
                   <select
                     value={selectedWorker.preTraining}
                     onChange={(e) => updateWorkerAttr(selectedAmrId, "preTraining", e.target.value as AmrTrainingLevel)}
-                    style={{ background: "#060D1E", border: "1px solid rgba(56, 189, 248, 0.3)", color: "#F8FAFC", fontSize: "11px", padding: "4px 8px", borderRadius: "4px", gridColumn: "span 2" }}
+                    className="console-select"
+                    style={{ gridColumn: "span 2" }}
                   >
                     <option value="Zone A Certified">Zone A High-Bay Certified</option>
                     <option value="Multi-Zone Master">Multi-Zone Master Clearance</option>
@@ -1967,7 +2050,8 @@ export function FleetDashboard() {
                   <select
                     value={selectedWorker.staffSafety || "Collaborative (ISO 3691-4 Level B - 0.5m buffer)"}
                     onChange={(e) => updateWorkerAttr(selectedAmrId, "staffSafety", e.target.value as StaffSafetyMode)}
-                    style={{ background: "#060D1E", border: "1px solid rgba(56, 189, 248, 0.3)", color: "#F8FAFC", fontSize: "11px", padding: "4px 8px", borderRadius: "4px", gridColumn: "span 2" }}
+                    className="console-select"
+                    style={{ gridColumn: "span 2" }}
                   >
                     <option value="Collaborative (ISO 3691-4 Level B - 0.5m buffer)">Collaborative (ISO 3691-4 Level B · 0.5m Human Safety Buffer)</option>
                     <option value="Staff Assist (Pick-to-Light Human Guided)">Staff Assist (Pick-to-Light Human Guided Picking)</option>
@@ -1986,7 +2070,7 @@ export function FleetDashboard() {
                     step="0.1"
                     value={selectedWorker.speed}
                     onChange={(e) => updateWorkerAttr(selectedAmrId, "speed", Number(e.target.value))}
-                    style={{ accentColor: "#38BDF8" }}
+                    style={{ accentColor: "#0284C7" }}
                   />
                   <span className="amr-attr-val">{selectedWorker.speed} m/s</span>
                 </div>
@@ -2001,7 +2085,7 @@ export function FleetDashboard() {
                     step="1"
                     value={selectedWorker.battery}
                     onChange={(e) => updateWorkerAttr(selectedAmrId, "battery", Number(e.target.value))}
-                    style={{ accentColor: selectedWorker.battery < 30 ? "#EF4444" : "#10B981" }}
+                    style={{ accentColor: selectedWorker.battery < 30 ? "var(--status-danger)" : "var(--status-nominal)" }}
                   />
                   <span className="amr-attr-val">{Math.round(selectedWorker.battery)}%</span>
                 </div>
@@ -2016,7 +2100,7 @@ export function FleetDashboard() {
                     step="50"
                     value={selectedWorker.maxPayloadKg}
                     onChange={(e) => updateWorkerAttr(selectedAmrId, "maxPayloadKg", Number(e.target.value))}
-                    style={{ accentColor: "#F59E0B" }}
+                    style={{ accentColor: "var(--status-warning)" }}
                   />
                   <span className="amr-attr-val">{selectedWorker.maxPayloadKg} kg</span>
                 </div>
@@ -2031,22 +2115,22 @@ export function FleetDashboard() {
                     step="0.1"
                     value={selectedWorker.safetyBufferM || 0.5}
                     onChange={(e) => updateWorkerAttr(selectedAmrId, "safetyBufferM", Number(e.target.value))}
-                    style={{ accentColor: "#10B981" }}
+                    style={{ accentColor: "var(--status-nominal)" }}
                   />
                   <span className="amr-attr-val">{selectedWorker.safetyBufferM || 0.5} m</span>
                 </div>
 
                 {/* Current Action / Job & Telemetry */}
-                <div style={{ marginTop: "6px", padding: "10px", borderRadius: "4px", background: "rgba(6, 12, 26, 0.8)", border: "1px solid rgba(255,255,255,0.06)" }}>
+                <div style={{ marginTop: "6px", padding: "10px", borderRadius: "4px", background: "var(--bg-surface)", border: "1px solid var(--border-subtle)" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
                     <span style={{ fontSize: "10px", color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>
                       CURRENT LIVE INTENT (LOCAL EDGE REASONING)
                     </span>
-                    <span style={{ fontSize: "10px", color: "#38BDF8", fontFamily: "var(--font-mono)" }}>
+                    <span style={{ fontSize: "10px", color: "var(--border-focus)", fontFamily: "var(--font-mono)" }}>
                       X: {Math.round(selectedWorker.position.x)}, Y: {Math.round(selectedWorker.position.y)}
                     </span>
                   </div>
-                  <div style={{ fontSize: "11px", color: "#CBD5E1", lineHeight: 1.4 }}>
+                  <div style={{ fontSize: "11px", color: "var(--text-secondary)", lineHeight: 1.4 }}>
                     {selectedWorker.carryingCargo
                       ? `Carrying ${selectedWorker.carryingCargo} towards destination bay. P2P space-time lease active.`
                       : selectedWorker.targetPosition
@@ -2056,9 +2140,9 @@ export function FleetDashboard() {
                       : "Standby idle at designated bay. Listening for Contract-Net task auctions."}
                   </div>
                   <div style={{ display: "flex", gap: "10px", marginTop: "6px", fontSize: "9.5px", fontFamily: "var(--font-mono)", color: "var(--text-muted)" }}>
-                    <span>Staff Clearance: <strong style={{ color: "#10B981" }}>{selectedWorker.staffSafety?.split("(")[0]}</strong></span>
+                    <span>Staff Clearance: <strong style={{ color: "var(--status-nominal)" }}>{selectedWorker.staffSafety?.split("(")[0]}</strong></span>
                     <span>•</span>
-                    <span>Delivered: <strong style={{ color: "#38BDF8" }}>{selectedWorker.completedJobsCount} jobs</strong></span>
+                    <span>Delivered: <strong style={{ color: "var(--status-active)" }}>{selectedWorker.completedJobsCount} jobs</strong></span>
                   </div>
                 </div>
               </div>
@@ -2070,8 +2154,8 @@ export function FleetDashboard() {
             <div className="cyber-panel" style={{ padding: "16px", borderRadius: "8px", display: "flex", flexDirection: "column", gap: "10px" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <div>
-                  <h4 style={{ fontSize: "13px", fontWeight: "700", color: "#F8FAFC" }}>P2P Gossip Communications</h4>
-                  <span style={{ fontSize: "10.5px", color: "#94A3B8", fontFamily: "var(--font-mono)" }}>
+                  <h4 style={{ fontSize: "13px", fontWeight: "700", color: "var(--text-primary)" }}>P2P Gossip Communications</h4>
+                  <span style={{ fontSize: "10.5px", color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>
                     ROS 2 Humble / Zenoh DDS Real-Time Peer Messages
                   </span>
                 </div>
@@ -2085,15 +2169,15 @@ export function FleetDashboard() {
                 </button>
               </div>
 
-              <div style={{ background: "rgba(4, 8, 18, 0.95)", border: "1px solid rgba(56, 189, 248, 0.2)", borderRadius: "6px", height: "460px", overflowY: "auto", padding: "8px" }}>
+              <div style={{ background: "var(--bg-elevated)", border: "1px solid var(--border-tactical)", borderRadius: "6px", height: "460px", overflowY: "auto", padding: "8px" }}>
                 {commsLog.length === 0 ? (
-                  <div style={{ textAlign: "center", padding: "30px", color: "#64748B", fontSize: "11px", fontFamily: "var(--font-mono)" }}>
+                  <div style={{ textAlign: "center", padding: "30px", color: "var(--text-muted)", fontSize: "11px", fontFamily: "var(--font-mono)" }}>
                     No messages yet. Run simulation or trigger an auction.
                   </div>
                 ) : (
                   commsLog.map((log) => (
                     <div key={log.id} className="comms-log-row">
-                      <span style={{ color: "#64748B", minWidth: "60px" }}>{log.time}</span>
+                      <span style={{ color: "var(--text-muted)", minWidth: "60px" }}>{log.time}</span>
                       <span style={{ color: log.color, flex: 1 }}>{log.text}</span>
                     </div>
                   ))
@@ -2111,32 +2195,34 @@ export function FleetDashboard() {
         <div className="sih-audit-backdrop" onClick={() => setShowNewJobModal(false)}>
           <div className="sih-audit-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: "480px" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "14px" }}>
-              <h3 style={{ fontSize: "15px", fontWeight: "800", color: "#F8FAFC", fontFamily: "var(--font-orbitron)" }}>
+              <h3 style={{ fontSize: "15px", fontWeight: "800", color: "var(--text-primary)", fontFamily: "var(--font-orbitron)" }}>
                 POST NEW WAREHOUSE JOB
               </h3>
-              <button type="button" onClick={() => setShowNewJobModal(false)} style={{ color: "#94A3B8" }}>✕</button>
+              <button type="button" onClick={() => setShowNewJobModal(false)} style={{ color: "var(--text-muted)", background: "transparent", border: "none", cursor: "pointer", fontSize: "16px" }}>✕</button>
             </div>
 
             <form onSubmit={handleCreateJob} style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
               <div>
-                <label style={{ fontSize: "11px", color: "#94A3B8", fontFamily: "var(--font-mono)", display: "block", marginBottom: "4px" }}>Job Title / Description</label>
+                <label style={{ fontSize: "11px", color: "var(--text-muted)", fontFamily: "var(--font-mono)", display: "block", marginBottom: "4px" }}>Job Title / Description</label>
                 <input
                   type="text"
                   value={newJobTitle}
                   onChange={(e) => setNewJobTitle(e.target.value)}
                   placeholder="e.g. Critical Avionics Pallet Delivery"
                   required
-                  style={{ width: "100%", background: "#060D1E", border: "1px solid rgba(56, 189, 248, 0.3)", color: "#F8FAFC", padding: "8px 10px", borderRadius: "4px", fontSize: "12px" }}
+                  className="console-field-input"
+                  style={{ width: "100%", fontSize: "12px" }}
                 />
               </div>
 
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
                 <div>
-                  <label style={{ fontSize: "11px", color: "#94A3B8", fontFamily: "var(--font-mono)", display: "block", marginBottom: "4px" }}>Pickup Location</label>
+                  <label style={{ fontSize: "11px", color: "var(--text-muted)", fontFamily: "var(--font-mono)", display: "block", marginBottom: "4px" }}>Pickup Location</label>
                   <select
                     value={newJobSource}
                     onChange={(e) => setNewJobSource(e.target.value)}
-                    style={{ width: "100%", background: "#060D1E", border: "1px solid rgba(56, 189, 248, 0.3)", color: "#F8FAFC", padding: "8px 10px", borderRadius: "4px", fontSize: "12px" }}
+                    className="console-select"
+                    style={{ width: "100%", fontSize: "12px" }}
                   >
                     <option value="DOCK EAST">Dock East (Inbound)</option>
                     <option value="DOCK WEST">Dock West (Outbound)</option>
@@ -2147,11 +2233,12 @@ export function FleetDashboard() {
                 </div>
 
                 <div>
-                  <label style={{ fontSize: "11px", color: "#94A3B8", fontFamily: "var(--font-mono)", display: "block", marginBottom: "4px" }}>Destination Bay</label>
+                  <label style={{ fontSize: "11px", color: "var(--text-muted)", fontFamily: "var(--font-mono)", display: "block", marginBottom: "4px" }}>Destination Bay</label>
                   <select
                     value={newJobDest}
                     onChange={(e) => setNewJobDest(e.target.value)}
-                    style={{ width: "100%", background: "#060D1E", border: "1px solid rgba(56, 189, 248, 0.3)", color: "#F8FAFC", padding: "8px 10px", borderRadius: "4px", fontSize: "12px" }}
+                    className="console-select"
+                    style={{ width: "100%", fontSize: "12px" }}
                   >
                     <option value="RACK A-04">Rack A-04 (Reserve)</option>
                     <option value="RACK B-04">Rack B-04 (Optics)</option>
@@ -2164,26 +2251,28 @@ export function FleetDashboard() {
 
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
                 <div>
-                  <label style={{ fontSize: "11px", color: "#94A3B8", fontFamily: "var(--font-mono)", display: "block", marginBottom: "4px" }}>Cargo Weight (kg)</label>
+                  <label style={{ fontSize: "11px", color: "var(--text-muted)", fontFamily: "var(--font-mono)", display: "block", marginBottom: "4px" }}>Cargo Weight (kg)</label>
                   <input
                     type="number"
                     min="50"
                     max="1500"
                     value={newJobWeight}
                     onChange={(e) => setNewJobWeight(Number(e.target.value))}
-                    style={{ width: "100%", background: "#060D1E", border: "1px solid rgba(56, 189, 248, 0.3)", color: "#F8FAFC", padding: "8px 10px", borderRadius: "4px", fontSize: "12px" }}
+                    className="console-field-input"
+                    style={{ width: "100%", fontSize: "12px" }}
                   />
                 </div>
 
                 <div>
-                  <label style={{ fontSize: "11px", color: "#94A3B8", fontFamily: "var(--font-mono)", display: "block", marginBottom: "4px" }}>Priority (1-100)</label>
+                  <label style={{ fontSize: "11px", color: "var(--text-muted)", fontFamily: "var(--font-mono)", display: "block", marginBottom: "4px" }}>Priority (1-100)</label>
                   <input
                     type="number"
                     min="1"
                     max="100"
                     value={newJobPriority}
                     onChange={(e) => setNewJobPriority(Number(e.target.value))}
-                    style={{ width: "100%", background: "#060D1E", border: "1px solid rgba(56, 189, 248, 0.3)", color: "#F8FAFC", padding: "8px 10px", borderRadius: "4px", fontSize: "12px" }}
+                    className="console-field-input"
+                    style={{ width: "100%", fontSize: "12px" }}
                   />
                 </div>
               </div>
@@ -2218,10 +2307,10 @@ export function FleetDashboard() {
           <div className="sih-audit-modal" style={{ maxWidth: "560px" }} onClick={(e) => e.stopPropagation()}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "14px" }}>
               <div>
-                <span style={{ fontFamily: "var(--font-mono)", fontSize: "10px", fontWeight: "700", color: "#10B981" }}>
+                <span style={{ fontFamily: "var(--font-mono)", fontSize: "10px", fontWeight: "700", color: "var(--status-nominal)" }}>
                   DECENTRALIZED AMR PROVISIONING · ISO 3691-4
                 </span>
-                <h3 style={{ fontSize: "16px", fontWeight: "800", color: "#F8FAFC", marginTop: "2px" }}>
+                <h3 style={{ fontSize: "16px", fontWeight: "800", color: "var(--text-primary)", marginTop: "2px" }}>
                   Deploy New AMR Worker Unit
                 </h3>
               </div>
@@ -2237,36 +2326,39 @@ export function FleetDashboard() {
             <form onSubmit={handleDeployWorker} style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
                 <div>
-                  <label style={{ fontSize: "11px", color: "#94A3B8", fontFamily: "var(--font-mono)", display: "block", marginBottom: "4px" }}>Worker ID</label>
+                  <label style={{ fontSize: "11px", color: "var(--text-muted)", fontFamily: "var(--font-mono)", display: "block", marginBottom: "4px" }}>Worker ID</label>
                   <input
                     type="text"
                     required
                     value={deployAmrId}
                     onChange={(e) => setDeployAmrId(e.target.value)}
                     placeholder="e.g. AMR-04"
-                    style={{ width: "100%", background: "#060D1E", border: "1px solid rgba(56, 189, 248, 0.3)", color: "#F8FAFC", padding: "8px 10px", borderRadius: "4px", fontSize: "12px" }}
+                    className="console-field-input"
+                    style={{ width: "100%", fontSize: "12px" }}
                   />
                 </div>
                 <div>
-                  <label style={{ fontSize: "11px", color: "#94A3B8", fontFamily: "var(--font-mono)", display: "block", marginBottom: "4px" }}>Callsign / Name</label>
+                  <label style={{ fontSize: "11px", color: "var(--text-muted)", fontFamily: "var(--font-mono)", display: "block", marginBottom: "4px" }}>Callsign / Name</label>
                   <input
                     type="text"
                     required
                     value={deployName}
                     onChange={(e) => setDeployName(e.target.value)}
                     placeholder="e.g. Delta"
-                    style={{ width: "100%", background: "#060D1E", border: "1px solid rgba(56, 189, 248, 0.3)", color: "#F8FAFC", padding: "8px 10px", borderRadius: "4px", fontSize: "12px" }}
+                    className="console-field-input"
+                    style={{ width: "100%", fontSize: "12px" }}
                   />
                 </div>
               </div>
 
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
                 <div>
-                  <label style={{ fontSize: "11px", color: "#94A3B8", fontFamily: "var(--font-mono)", display: "block", marginBottom: "4px" }}>Assigned Role</label>
+                  <label style={{ fontSize: "11px", color: "var(--text-muted)", fontFamily: "var(--font-mono)", display: "block", marginBottom: "4px" }}>Assigned Role</label>
                   <select
                     value={deployRole}
                     onChange={(e) => setDeployRole(e.target.value as AmrRole)}
-                    style={{ width: "100%", background: "#060D1E", border: "1px solid rgba(56, 189, 248, 0.3)", color: "#F8FAFC", padding: "8px 10px", borderRadius: "4px", fontSize: "12px" }}
+                    className="console-select"
+                    style={{ width: "100%", fontSize: "12px" }}
                   >
                     <option value="Heavy Pallet Lifter">Heavy Pallet Lifter (1200kg)</option>
                     <option value="Agile Tote Picker">Agile Tote Picker (350kg)</option>
@@ -2275,11 +2367,12 @@ export function FleetDashboard() {
                   </select>
                 </div>
                 <div>
-                  <label style={{ fontSize: "11px", color: "#94A3B8", fontFamily: "var(--font-mono)", display: "block", marginBottom: "4px" }}>Spawn Location</label>
+                  <label style={{ fontSize: "11px", color: "var(--text-muted)", fontFamily: "var(--font-mono)", display: "block", marginBottom: "4px" }}>Spawn Location</label>
                   <select
                     value={deployLocation}
                     onChange={(e) => setDeployLocation(e.target.value as AmrLocation)}
-                    style={{ width: "100%", background: "#060D1E", border: "1px solid rgba(56, 189, 248, 0.3)", color: "#F8FAFC", padding: "8px 10px", borderRadius: "4px", fontSize: "12px" }}
+                    className="console-select"
+                    style={{ width: "100%", fontSize: "12px" }}
                   >
                     <option value="Dock East">Dock East (Inbound Staging)</option>
                     <option value="Dock West">Dock West (Outbound Staging)</option>
@@ -2291,11 +2384,12 @@ export function FleetDashboard() {
               </div>
 
               <div>
-                <label style={{ fontSize: "11px", color: "#94A3B8", fontFamily: "var(--font-mono)", display: "block", marginBottom: "4px" }}>Area Pre-Training &amp; Clearance</label>
+                <label style={{ fontSize: "11px", color: "var(--text-muted)", fontFamily: "var(--font-mono)", display: "block", marginBottom: "4px" }}>Area Pre-Training &amp; Clearance</label>
                 <select
                   value={deployPreTraining}
                   onChange={(e) => setDeployPreTraining(e.target.value as AmrTrainingLevel)}
-                  style={{ width: "100%", background: "#060D1E", border: "1px solid rgba(56, 189, 248, 0.3)", color: "#F8FAFC", padding: "8px 10px", borderRadius: "4px", fontSize: "12px" }}
+                  className="console-select"
+                  style={{ width: "100%", fontSize: "12px" }}
                 >
                   <option value="Zone A Certified">Zone A High-Bay Certified</option>
                   <option value="Multi-Zone Master">Multi-Zone Master Clearance</option>
@@ -2304,11 +2398,12 @@ export function FleetDashboard() {
               </div>
 
               <div>
-                <label style={{ fontSize: "11px", color: "#94A3B8", fontFamily: "var(--font-mono)", display: "block", marginBottom: "4px" }}>Staff Co-Working Pre-Training &amp; Safety</label>
+                <label style={{ fontSize: "11px", color: "var(--text-muted)", fontFamily: "var(--font-mono)", display: "block", marginBottom: "4px" }}>Staff Co-Working Pre-Training &amp; Safety</label>
                 <select
                   value={deployStaffSafety}
                   onChange={(e) => setDeployStaffSafety(e.target.value as StaffSafetyMode)}
-                  style={{ width: "100%", background: "#060D1E", border: "1px solid rgba(56, 189, 248, 0.3)", color: "#F8FAFC", padding: "8px 10px", borderRadius: "4px", fontSize: "12px" }}
+                  className="console-select"
+                  style={{ width: "100%", fontSize: "12px" }}
                 >
                   <option value="Collaborative (ISO 3691-4 Level B - 0.5m buffer)">Collaborative (ISO 3691-4 Level B · 0.5m Human Safety Buffer)</option>
                   <option value="Staff Assist (Pick-to-Light Human Guided)">Staff Assist (Pick-to-Light Human Guided Picking)</option>
@@ -2319,7 +2414,7 @@ export function FleetDashboard() {
 
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "10px" }}>
                 <div>
-                  <label style={{ fontSize: "11px", color: "#94A3B8", fontFamily: "var(--font-mono)", display: "block", marginBottom: "4px" }}>Speed: {deploySpeed} m/s</label>
+                  <label style={{ fontSize: "11px", color: "var(--text-muted)", fontFamily: "var(--font-mono)", display: "block", marginBottom: "4px" }}>Speed: {deploySpeed} m/s</label>
                   <input
                     type="range"
                     min="0.5"
@@ -2327,22 +2422,22 @@ export function FleetDashboard() {
                     step="0.1"
                     value={deploySpeed}
                     onChange={(e) => setDeploySpeed(Number(e.target.value))}
-                    style={{ width: "100%", accentColor: "#38BDF8" }}
+                    style={{ width: "100%", accentColor: "#0284C7" }}
                   />
                 </div>
                 <div>
-                  <label style={{ fontSize: "11px", color: "#94A3B8", fontFamily: "var(--font-mono)", display: "block", marginBottom: "4px" }}>Battery: {deployBattery}%</label>
+                  <label style={{ fontSize: "11px", color: "var(--text-muted)", fontFamily: "var(--font-mono)", display: "block", marginBottom: "4px" }}>Battery: {deployBattery}%</label>
                   <input
                     type="range"
                     min="20"
                     max="100"
                     value={deployBattery}
                     onChange={(e) => setDeployBattery(Number(e.target.value))}
-                    style={{ width: "100%", accentColor: "#10B981" }}
+                    style={{ width: "100%", accentColor: "var(--status-nominal)" }}
                   />
                 </div>
                 <div>
-                  <label style={{ fontSize: "11px", color: "#94A3B8", fontFamily: "var(--font-mono)", display: "block", marginBottom: "4px" }}>Max Payload: {deployMaxPayload}kg</label>
+                  <label style={{ fontSize: "11px", color: "var(--text-muted)", fontFamily: "var(--font-mono)", display: "block", marginBottom: "4px" }}>Max Payload: {deployMaxPayload}kg</label>
                   <input
                     type="range"
                     min="200"
@@ -2350,7 +2445,7 @@ export function FleetDashboard() {
                     step="50"
                     value={deployMaxPayload}
                     onChange={(e) => setDeployMaxPayload(Number(e.target.value))}
-                    style={{ width: "100%", accentColor: "#F59E0B" }}
+                    style={{ width: "100%", accentColor: "var(--status-warning)" }}
                   />
                 </div>
               </div>
@@ -2385,10 +2480,10 @@ export function FleetDashboard() {
           <div className="sih-audit-modal" onClick={(e) => e.stopPropagation()}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "16px" }}>
               <div>
-                <span style={{ fontFamily: "var(--font-mono)", fontSize: "10px", fontWeight: "700", color: "#38BDF8", textTransform: "uppercase" }}>
+                <span style={{ fontFamily: "var(--font-mono)", fontSize: "10px", fontWeight: "700", color: "var(--border-focus)", textTransform: "uppercase" }}>
                   SIH26123 OFFICIAL BENCHMARK · BHARAT ELECTRONICS LIMITED (BEL)
                 </span>
-                <h3 style={{ fontSize: "18px", fontWeight: "800", color: "#F8FAFC", marginTop: "2px" }}>
+                <h3 style={{ fontSize: "18px", fontWeight: "800", color: "var(--text-primary)", marginTop: "2px" }}>
                   Edge-AI Distributed Fleet Coordination Audit
                 </h3>
               </div>
@@ -2404,17 +2499,17 @@ export function FleetDashboard() {
             {/* 4 Quantitative KPI Cards */}
             <div className="sih-metric-kpi-grid">
               <div className="sih-kpi-box">
-                <div className="sih-kpi-val" style={{ color: "#10B981" }}>0.00s</div>
+                <div className="sih-kpi-val" style={{ color: "var(--status-nominal)" }}>0.00s</div>
                 <div className="sih-kpi-title">Outage Downtime</div>
                 <div style={{ fontSize: "9px", color: "var(--text-muted)", marginTop: "4px" }}>Zero plant stoppage on Wi-Fi drop</div>
               </div>
               <div className="sih-kpi-box">
-                <div className="sih-kpi-val" style={{ color: "#38BDF8" }}>42 ms</div>
+                <div className="sih-kpi-val" style={{ color: "var(--status-active)" }}>42 ms</div>
                 <div className="sih-kpi-title">P2P Lease Quorum</div>
                 <div style={{ fontSize: "9px", color: "var(--text-muted)", marginTop: "4px" }}>vs 850ms cloud round-trip</div>
               </div>
               <div className="sih-kpi-box">
-                <div className="sih-kpi-val" style={{ color: "#F59E0B" }}>100%</div>
+                <div className="sih-kpi-val" style={{ color: "var(--status-warning)" }}>100%</div>
                 <div className="sih-kpi-title">Collision-Free</div>
                 <div style={{ fontSize: "9px", color: "var(--text-muted)", marginTop: "4px" }}>ISO 3691-4:2023 §5.2.3 compliant</div>
               </div>
@@ -2437,22 +2532,22 @@ export function FleetDashboard() {
               </thead>
               <tbody>
                 <tr>
-                  <td style={{ fontWeight: "700", color: "#F8FAFC" }}>Single Point of Failure (SPOF)</td>
-                  <td style={{ color: "#EF4444" }}>Central server crash halts all 50+ AMRs simultaneously ($85,000/hr downtime)</td>
-                  <td style={{ color: "#10B981", fontWeight: "700" }}>Zero SPOF. Autonomous peer quorum over local ROS 2 / Zenoh mesh</td>
-                  <td style={{ color: "#38BDF8" }}>Continuous 24/7 mission continuity</td>
+                  <td style={{ fontWeight: "700", color: "var(--text-primary)" }}>Single Point of Failure (SPOF)</td>
+                  <td style={{ color: "var(--status-danger)" }}>Central server crash halts all 50+ AMRs simultaneously ($85,000/hr downtime)</td>
+                  <td style={{ color: "var(--status-nominal)", fontWeight: "700" }}>Zero SPOF. Autonomous peer quorum over local ROS 2 / Zenoh mesh</td>
+                  <td style={{ color: "var(--status-active)" }}>Continuous 24/7 mission continuity</td>
                 </tr>
                 <tr>
-                  <td style={{ fontWeight: "700", color: "#F8FAFC" }}>Chokepoint Negotiation (Corridor C-14)</td>
-                  <td style={{ color: "#EF4444" }}>Cloud polling delay; frequent head-on deadlocks requiring human teleoperation</td>
-                  <td style={{ color: "#10B981", fontWeight: "700" }}>42ms space-time micro-leases with deterministic utility scoring</td>
-                  <td style={{ color: "#38BDF8" }}>0 deadlocks; 27% higher aisle throughput</td>
+                  <td style={{ fontWeight: "700", color: "var(--text-primary)" }}>Chokepoint Negotiation (Corridor C-14)</td>
+                  <td style={{ color: "var(--status-danger)" }}>Cloud polling delay; frequent head-on deadlocks requiring human teleoperation</td>
+                  <td style={{ color: "var(--status-nominal)", fontWeight: "700" }}>42ms space-time micro-leases with deterministic utility scoring</td>
+                  <td style={{ color: "var(--status-active)" }}>0 deadlocks; 27% higher aisle throughput</td>
                 </tr>
                 <tr>
-                  <td style={{ fontWeight: "700", color: "#F8FAFC" }}>Dynamic Obstacle Handling (Aisle B-07)</td>
-                  <td style={{ color: "#F59E0B" }}>Robots wait for central re-planning cycle (3s to 12s stop)</td>
-                  <td style={{ color: "#10B981", fontWeight: "700" }}>Onboard D* Lite re-plans perimeter route P-2 in 42ms with peer broadcast</td>
-                  <td style={{ color: "#38BDF8" }}>Zero transit interruption</td>
+                  <td style={{ fontWeight: "700", color: "var(--text-primary)" }}>Dynamic Obstacle Handling (Aisle B-07)</td>
+                  <td style={{ color: "var(--status-warning)" }}>Robots wait for central re-planning cycle (3s to 12s stop)</td>
+                  <td style={{ color: "var(--status-nominal)", fontWeight: "700" }}>Onboard D* Lite re-plans perimeter route P-2 in 42ms with peer broadcast</td>
+                  <td style={{ color: "var(--status-active)" }}>Zero transit interruption</td>
                 </tr>
               </tbody>
             </table>
