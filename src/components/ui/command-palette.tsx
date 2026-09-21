@@ -90,7 +90,7 @@ export function CommandPalette({
       category: "Navigation",
       title: "Jump to Live Digital Twin Simulator",
       description: "Warehouse Zone 02 floor map & peer arbitration",
-      icon: <Activity className="w-4 h-4 text-blue-500" />,
+      icon: <Activity className="w-4 h-4" style={{ color: "var(--solar-terracotta)" }} />,
       shortcut: "G S",
       perform: () => {
         document.getElementById("simulator")?.scrollIntoView({ behavior: "smooth" });
@@ -98,14 +98,26 @@ export function CommandPalette({
       },
     },
     {
-      id: "nav-bento",
+      id: "nav-protocol",
       category: "Navigation",
-      title: "Jump to Systems Intelligence Bento",
-      description: "Corridor arbitration slider and cloud severance sandbox",
-      icon: <Layers className="w-4 h-4 text-indigo-500" />,
-      shortcut: "G B",
+      title: "Jump to Protocol Consensus Loop",
+      description: "4-stage peer consensus: intent broadcast, mutex lease, transit, ACK",
+      icon: <Layers className="w-4 h-4" style={{ color: "var(--solar-terracotta)" }} />,
+      shortcut: "G P",
       perform: () => {
-        document.getElementById("bento-architecture")?.scrollIntoView({ behavior: "smooth" });
+        document.getElementById("protocol-flow")?.scrollIntoView({ behavior: "smooth" });
+        setIsOpen(false);
+      },
+    },
+    {
+      id: "nav-architecture",
+      category: "Navigation",
+      title: "Jump to Mathematical Architecture",
+      description: "Formal space-time reservations, dynamic windows, and Bellman-Ford formulations",
+      icon: <Shield className="w-4 h-4" style={{ color: "var(--solar-terracotta)" }} />,
+      shortcut: "G A",
+      perform: () => {
+        document.getElementById("architecture")?.scrollIntoView({ behavior: "smooth" });
         setIsOpen(false);
       },
     },
@@ -114,7 +126,7 @@ export function CommandPalette({
       category: "Navigation",
       title: "Open Operator Console",
       description: "Real-time telemetry streams, mission logs, and ROS 2 bus",
-      icon: <Terminal className="w-4 h-4 text-emerald-500" />,
+      icon: <Terminal className="w-4 h-4" style={{ color: "var(--solar-terracotta)" }} />,
       shortcut: "G C",
       perform: () => {
         router.push("/console");
@@ -150,7 +162,7 @@ export function CommandPalette({
       category: "Simulation",
       title: "Play / Pause Fleet Simulation",
       description: "Toggle deterministic 600ms tick cycle",
-      icon: <Activity className="w-4 h-4 text-emerald-500" />,
+      icon: <Activity className="w-4 h-4" style={{ color: "var(--solar-terracotta)" }} />,
       shortcut: "Space",
       perform: () => {
         onToggleRunning?.();
@@ -185,7 +197,7 @@ export function CommandPalette({
       category: "System",
       title: audioActive ? "Disable Tactile Audio Feedback" : "Enable Tactile Audio Feedback",
       description: "Micro-haptic clicks, sonar pings, and telemetry chords",
-      icon: audioActive ? <VolumeX className="w-4 h-4 text-rose-500" /> : <Volume2 className="w-4 h-4 text-emerald-500" />,
+      icon: audioActive ? <VolumeX className="w-4 h-4 text-rose-500" /> : <Volume2 className="w-4 h-4 text-amber-500" />,
       perform: () => {
         const next = toggleAudio();
         setAudioActive(next);
@@ -230,11 +242,12 @@ export function CommandPalette({
           setIsOpen(true);
         }}
         className="tactile-floating-btn"
-        aria-label="Open Command Palette (Cmd+K)"
-        title="Open Command Palette (Cmd+K)"
+        aria-label="Open Command Palette (⌘K)"
+        title="Open Command Palette (⌘K)"
       >
-        <Command className="w-4 h-4" />
-        <span className="floating-btn-text">⌘K Actions</span>
+        <Command className="w-3.5 h-3.5" style={{ color: "var(--solar-terracotta)" }} />
+        <span className="floating-btn-text">Quick Actions</span>
+        <kbd className="floating-btn-kbd">⌘K</kbd>
       </button>
 
       {/* Backdrop & Modal */}

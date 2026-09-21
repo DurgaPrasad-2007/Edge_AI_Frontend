@@ -249,8 +249,8 @@ export function RobotHudModal({ robot, onClose }: RobotHudModalProps) {
 
         {/* Footer / Safety Boundary notice */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid var(--border-subtle)", paddingTop: 14 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "var(--text-muted)" }}>
-            <ShieldCheck className="w-4 h-4 text-emerald-600" />
+          <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "var(--text-secondary)" }}>
+            <ShieldCheck className="w-4 h-4" style={{ color: "var(--solar-terracotta)" }} />
             <span>Telemetry Inspector &middot; SIL-2 Zero-Motion Observer</span>
           </div>
           <button

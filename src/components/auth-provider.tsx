@@ -57,20 +57,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    // Check for offline mock evaluation session
-    const mockUserStr = window.sessionStorage.getItem("edgefleet_mock_user");
-    if (mockUserStr) {
-      try {
-        const parsed = JSON.parse(mockUserStr) as User;
-        setSession({ access_token: token });
-        setUser(parsed);
-        setLoading(false);
-        return;
-      } catch {
-        // Continue to API check
-      }
-    }
-
     try {
       const response = await fetch(`${apiBase}/api/auth/me`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -84,7 +70,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch {
       // Invalidate expired/unreachable token
       window.sessionStorage.removeItem("edgefleet_access_token");
-      window.sessionStorage.removeItem("edgefleet_mock_user");
       setSession(null);
       setUser(null);
     } finally {
@@ -109,7 +94,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       trimmedEmail === "operator@edgefleet.local" &&
       (trimmedPassword === "operator-demo-2026" || trimmedPassword === "operator" || trimmedPassword === "demo");
 
-    // 1. Try real API first if available
+    // 1. Authenticate with real Python FastAPI backend via OAuth2 Form
     try {
       const body = new URLSearchParams({ username: trimmedEmail, password: trimmedPassword });
       const response = await fetch(`${apiBase}/api/auth/token`, {
@@ -134,41 +119,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setUser(userData);
           return;
         }
+      } else {
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.detail || "Invalid email or password on EdgeFleet backend");
       }
-    } catch {
-      // API unreachable, fall through to evaluation demo fallback
+    } catch (err: unknown) {
+      if (err instanceof Error && err.message !== "Failed to fetch") {
+        throw err;
+      }
+      throw new Error("Unable to connect to EdgeFleet backend API at " + apiBase + ". Ensure python uvicorn server is running.");
     }
-
-    // 2. Evaluation / Demo Fallback (Guarantees evaluator is never locked out)
-    if (isDemoAdmin) {
-      const mockUser: User = {
-        id: "USR-ADMIN-001",
-        email: "admin@edgefleet.local",
-        roles: ["admin", "operator", "viewer"],
-      };
-      const mockToken = "mock_admin_token_" + Date.now();
-      window.sessionStorage.setItem("edgefleet_access_token", mockToken);
-      window.sessionStorage.setItem("edgefleet_mock_user", JSON.stringify(mockUser));
-      setSession({ access_token: mockToken });
-      setUser(mockUser);
-      return;
-    }
-
-    if (isDemoOperator) {
-      const mockUser: User = {
-        id: "USR-OP-002",
-        email: "operator@edgefleet.local",
-        roles: ["operator", "viewer"],
-      };
-      const mockToken = "mock_operator_token_" + Date.now();
-      window.sessionStorage.setItem("edgefleet_access_token", mockToken);
-      window.sessionStorage.setItem("edgefleet_mock_user", JSON.stringify(mockUser));
-      setSession({ access_token: mockToken });
-      setUser(mockUser);
-      return;
-    }
-
-    throw new Error("Invalid credentials. Please click one of the pre-configured Demo Credential buttons.");
   };
 
   const signOut = () => {

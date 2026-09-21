@@ -3,15 +3,15 @@ import Link from "next/link";
 
 export function ReviewerSnapshot() {
   const points = [
-    { label: "SIH Challenge ID", val: "Problem Statement 26123", status: "Official" },
-    { label: "Target Industrial Domain", val: "High-Bay Smart Warehouses & Factory Logistics", status: "Verified" },
+    { label: "SIH Challenge ID", val: "Problem Statement 26123 (BEL)", status: "Official" },
+    { label: "Submission Scope", val: "Software-first 3-AMR peer mesh evaluation prototype", status: "Verified" },
     { label: "Coordination Protocol", val: "Decentralized P2P Space-Time Mutex & Contract-Net", status: "Zero SPOF" },
-    { label: "Decision Latency", val: "<84ms P95 over local ROS 2 / Zenoh DDS mesh", status: "10x Gain" },
+    { label: "Decision Latency", val: "p95 < 150ms over local LAN (~84ms observed in testbed)", status: "Target Met" },
     { label: "Chokepoint Arbitration", val: "Corridor C-14 deterministic utility leases", status: "0 Deadlocks" },
-    { label: "Dynamic Obstacle Detour", val: "Aisle B-07 invalidation & autonomous reroute in <42ms", status: "Real-time" },
-    { label: "Safety Standard", val: "ISO 3691-4:2023 (0.5m dynamic safety envelope)", status: "Compliant" },
-    { label: "Web API Boundary", val: "SIL-2 Zero-Motion Observer Guarantee (No wheel commands)", status: "Enforced" },
-    { label: "Knowledge Store", val: "PostgreSQL 16 + pgvector (384-d HNSW index)", status: "<15ms RAG" },
+    { label: "Dynamic Obstacle Detour", val: "Aisle B-07 invalidation & autonomous D* Lite reroute", status: "Real-time" },
+    { label: "Safety Standard", val: "Engineered to ISO 3691-4 clearance principles (0.5m envelope)", status: "Aligned Design" },
+    { label: "Web API Boundary", val: "Zero-Motion Observer: console & API issue no wheel commands", status: "Enforced" },
+    { label: "Knowledge Store", val: "PostgreSQL 16 + pgvector (384-d HNSW index)", status: "Audit Only" },
     { label: "Edge Hardware Footprint", val: "Raspberry Pi 5 / Jetson Orin (<120MB RAM, <12W)", status: "SWaP-C" },
   ];
 

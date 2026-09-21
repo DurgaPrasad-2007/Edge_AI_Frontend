@@ -107,8 +107,8 @@ export function RagSearch() {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 12, marginBottom: 16 }}>
         <div>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-            <Database className="w-4 h-4 text-emerald-600" />
-            <span className="font-mono" style={{ fontSize: 11, fontWeight: 700, color: "var(--status-nominal)", letterSpacing: "0.05em" }}>
+            <Database className="w-4 h-4" style={{ color: "var(--solar-terracotta)" }} />
+            <span className="font-mono" style={{ fontSize: 11, fontWeight: 700, color: "var(--solar-terracotta)", letterSpacing: "0.05em" }}>
               POSTGRESQL + PGVECTOR / HNSW INDEX
             </span>
           </div>

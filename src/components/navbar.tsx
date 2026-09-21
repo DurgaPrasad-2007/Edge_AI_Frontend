@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { Search } from "lucide-react";
 import { useAuth } from "@/components/auth-provider";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { EdgeAiLogo } from "@/components/brand/edge-ai-logo";
@@ -12,28 +13,30 @@ interface NavbarProps {
   onOpenCmdPalette?: () => void;
 }
 
-export function Navbar({ onOpenUserModal }: NavbarProps) {
+export function Navbar({ onOpenUserModal, onOpenCmdPalette }: NavbarProps) {
   const auth = useAuth();
 
   return (
     <header className="site-navbar" role="banner">
       <div className="navbar-container">
-        {/* Brand */}
-        <Link
-          href="/"
-          className="nav-brand"
-          aria-label="Edge AI Home"
-          onClick={() => playClick()}
-          style={{ textDecoration: "none" }}
-        >
-          <EdgeAiLogo size={30} />
-        </Link>
+        {/* Brand & Breadcrumb Identity */}
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <Link
+            href="/"
+            className="nav-brand"
+            aria-label="Edge AI Home"
+            onClick={() => playClick()}
+            style={{ textDecoration: "none", display: "flex", alignItems: "center", gap: 8 }}
+          >
+            <EdgeAiLogo size={28} />
+          </Link>
+        </div>
 
-        {/* Streamlined Navigation Links (Pure Typography, No Cluttered Icons) */}
+        {/* Streamlined Typography Links (21st.dev Architecture) */}
         <nav aria-label="Main Navigation" className="nav-navigation">
           <ul className="nav-menu">
             <li>
-              <a href="/#bento-architecture" className="nav-link" onClick={() => playClick()}>
+              <a href="/#architecture" className="nav-link" onClick={() => playClick()}>
                 Systems
               </a>
             </li>
@@ -65,9 +68,78 @@ export function Navbar({ onOpenUserModal }: NavbarProps) {
           </ul>
         </nav>
 
-        {/* Right Actions: Restrained, Focused, High-Affordance */}
+        {/* Right Actions: Command Trigger, Mesh Status, Theme, and Console CTA */}
         <div className="nav-actions">
-          {/* Theme Toggle */}
+          {/* Quick Command Trigger (21st.dev Style) */}
+          {onOpenCmdPalette && (
+            <button
+              type="button"
+              onClick={() => {
+                playClick();
+                onOpenCmdPalette();
+              }}
+              aria-label="Open command palette"
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                padding: "4px 10px",
+                borderRadius: 6,
+                border: "1px solid var(--border-subtle)",
+                background: "var(--bg-elevated)",
+                color: "var(--text-muted)",
+                fontSize: 12,
+                cursor: "pointer",
+                transition: "all 0.15s ease",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.borderColor = "var(--border-tactical)";
+                e.currentTarget.style.color = "var(--text-primary)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.borderColor = "var(--border-subtle)";
+                e.currentTarget.style.color = "var(--text-muted)";
+              }}
+            >
+              <Search className="w-3.5 h-3.5" />
+              <span className="hidden md:inline" style={{ fontSize: 11.5 }}>Search</span>
+              <kbd
+                style={{
+                  fontSize: 9.5,
+                  fontFamily: "var(--font-mono)",
+                  padding: "1px 5px",
+                  borderRadius: 3,
+                  background: "var(--bg-surface)",
+                  border: "1px solid var(--border-subtle)",
+                  color: "var(--text-secondary)",
+                }}
+              >
+                ⌘K
+              </kbd>
+            </button>
+          )}
+
+          {/* Peer Mesh Status Pill */}
+          <div
+            className="hidden lg:flex items-center gap-2"
+            style={{
+              fontSize: 11,
+              fontFamily: "var(--font-mono)",
+              fontWeight: 600,
+              padding: "4px 10px",
+              borderRadius: 6,
+              background: "var(--bg-elevated)",
+              border: "1px solid var(--border-subtle)",
+              color: "var(--text-primary)",
+              whiteSpace: "nowrap",
+            }}
+            title="3-AMR peer mesh operational with zero central cloud dependency"
+          >
+            <span style={{ width: 6, height: 6, borderRadius: "50%", backgroundColor: "var(--solar-terracotta)", boxShadow: "0 0 6px rgba(194, 84, 26, 0.4)" }} />
+            <span>3/3 Peers</span>
+          </div>
+
+          {/* Theme Toggle (Tactile Sun/Moon) */}
           <ThemeToggle />
 
           {/* Auth State & Console CTA */}
@@ -81,7 +153,7 @@ export function Navbar({ onOpenUserModal }: NavbarProps) {
                   background: "var(--bg-elevated)",
                   padding: "4px 8px",
                   borderRadius: 6,
-                  border: "1px solid var(--border-tactical)",
+                  border: "1px solid var(--border-subtle)",
                   fontSize: 11,
                   fontFamily: "var(--font-mono)",
                 }}
@@ -93,7 +165,7 @@ export function Navbar({ onOpenUserModal }: NavbarProps) {
                     fontWeight: 700,
                     padding: "1px 5px",
                     borderRadius: 3,
-                    background: "var(--bg-muted)",
+                    background: "var(--bg-surface)",
                     color: "var(--text-primary)",
                   }}
                 >
@@ -159,4 +231,3 @@ export function Navbar({ onOpenUserModal }: NavbarProps) {
     </header>
   );
 }
-

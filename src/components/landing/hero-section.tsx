@@ -2,9 +2,10 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { Terminal, Copy, Check, ShieldCheck, Radio, ArrowRight } from "lucide-react";
 import type { RobotId } from "@/lib/fleet-contract";
-import { SpotlightCard } from "@/components/ui/spotlight-card";
 import { AnimatedCounter } from "@/components/ui/animated-counter";
+import { ContainerScroll } from "@/components/ui/container-scroll";
 import { playClick, playChirp } from "@/lib/sound-effects";
 
 interface HeroSectionProps {
@@ -65,52 +66,44 @@ const HERO_HOTSPOTS: Hotspot[] = [
 
 export function HeroSection({ reservation }: HeroSectionProps) {
   const [activeHotspot, setActiveHotspot] = useState<Hotspot | null>(null);
+  const [copiedCli, setCopiedCli] = useState(false);
+
+  const cliCommand = "zenoh-bridge-ros2dds -c /etc/edgefleet/mesh.json5";
+
+  const handleCopyCli = () => {
+    playClick();
+    if (typeof navigator !== "undefined" && navigator.clipboard) {
+      navigator.clipboard.writeText(cliCommand);
+      setCopiedCli(true);
+      setTimeout(() => setCopiedCli(false), 2000);
+    }
+  };
 
   return (
     <section
       id="overview"
       className="content-section hero-container"
       style={{
-        paddingTop: 42,
-        paddingBottom: 40,
+        paddingTop: 36,
+        paddingBottom: 48,
         position: "relative",
       }}
     >
-      {/* Unified Technical Context Breadcrumb */}
-      <div
-        style={{
-          display: "inline-flex",
-          alignItems: "center",
-          gap: 10,
-          padding: "5px 14px",
-          borderRadius: 9999,
-          background: "var(--bg-elevated)",
-          border: "1px solid var(--border-tactical)",
-          fontSize: 12,
-          fontFamily: "var(--font-mono)",
-          color: "var(--text-secondary)",
-          marginBottom: 20,
-          flexWrap: "wrap",
-        }}
-      >
-        <span style={{ fontWeight: 700, color: "var(--text-primary)" }}>SIH 2026 // PS-26123</span>
-        <span style={{ color: "var(--text-muted)", opacity: 0.5 }}>&bull;</span>
-        <span>Bharat Electronics Limited Benchmark</span>
-        <span style={{ color: "var(--text-muted)", opacity: 0.5 }}>&bull;</span>
-        <span>ISO 3691-4:2023 Compliant</span>
+      {/* 21st.dev Style Industrial Specification Kicker */}
+      <div className="technical-kicker-bar" style={{ marginBottom: 20 }}>
+        <span className="kicker-tag">SIH 2026 // PS-26123</span>
+        <span className="kicker-sep">/</span>
+        <span className="kicker-item">Bharat Electronics Limited (BEL) Benchmark</span>
+        <span className="kicker-sep">/</span>
+        <span className="kicker-item kicker-active">
+          <span className="kicker-dot" /> Evaluation Architecture &middot; Software-First
+        </span>
       </div>
 
-      {/* Main Hero Headline */}
-      <h1
-        style={{
-          marginBottom: 20,
-          maxWidth: 960,
-          fontWeight: 800,
-          letterSpacing: "-0.025em",
-          lineHeight: 1.15,
-        }}
-      >
-        Distributed Edge-AI Fleet Coordination for Autonomous Mobile Robots
+      {/* Signature 21st.dev Two-Tone Display Headline */}
+      <h1 className="hero-display-title">
+        <span className="text-display-muted">Distributed Edge-AI Fleet Coordination. </span>
+        <span className="text-display-emphasis">Zero Central Cloud SPOF.</span>
       </h1>
 
       {/* Value Proposition Lead */}
@@ -120,106 +113,130 @@ export function HeroSection({ reservation }: HeroSectionProps) {
           color: "var(--text-secondary)",
           maxWidth: 860,
           lineHeight: 1.6,
-          marginBottom: 32,
+          marginBottom: 28,
         }}
       >
         Eliminate single-point-of-failure cloud dispatchers. EdgeFleet deploys lightweight, deterministic peer
         coordination agents directly onto AMR microcomputers. Robots negotiate single-lane corridor leases across a
-        local ROS 2 / Zenoh peer mesh, dynamically detour around blocked aisles, and auction task handoffs in &lt;84ms
-        with zero cloud dependency.
+        local ROS 2 / Zenoh peer mesh, dynamically detour around blocked aisles, and auction task handoffs with p95 &lt; 150ms
+        decision latency (~84ms observed in testbed) and zero cloud dependency.
       </p>
 
-      {/* Primary Hero CTAs */}
-      <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap", marginBottom: 38 }}>
+      {/* Primary CTAs & Developer CLI Quick-Action Bar */}
+      <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap", marginBottom: 36 }}>
         <a
           href="#simulator"
           className="btn btn-primary"
-          style={{ padding: "12px 24px", fontSize: 14 }}
+          style={{ padding: "11px 22px", fontSize: 13.5 }}
           onClick={() => playClick()}
         >
-          Launch Floor Simulator &rarr;
+          Launch Floor Twin &rarr;
         </a>
 
         <a
-          href="#workflow"
+          href="#protocol-flow"
           className="btn btn-secondary"
-          style={{ padding: "12px 22px", fontSize: 14 }}
+          style={{ padding: "11px 20px", fontSize: 13.5 }}
           onClick={() => playClick()}
         >
-          Explore Workflow &rarr;
+          Consensus Loop &rarr;
         </a>
 
         <Link
           href="/console"
           className="btn btn-secondary"
           id="btn-operator-console-hero"
-          style={{ padding: "12px 22px", fontSize: 14 }}
+          style={{ padding: "11px 20px", fontSize: 13.5 }}
           onClick={() => playClick()}
         >
           Operator Console &rarr;
         </Link>
+
+        {/* 21st.dev Developer Quick Launch CLI Bar */}
+        <div className="action-cli-bar" title="Direct peer mesh initialization command">
+          <Terminal className="w-3.5 h-3.5 text-muted" />
+          <code>{cliCommand}</code>
+          <button
+            type="button"
+            onClick={handleCopyCli}
+            aria-label="Copy mesh startup command"
+            style={{
+              background: "transparent",
+              border: "none",
+              cursor: "pointer",
+              padding: "2px 4px",
+              color: copiedCli ? "var(--solar-terracotta)" : "var(--text-muted)",
+              display: "inline-flex",
+              alignItems: "center",
+            }}
+          >
+            {copiedCli ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+          </button>
+        </div>
       </div>
 
-      {/* Metric Strip (Clean, Architectural, Zero Distracting Lines) */}
-      <div className="metric-strip" style={{ marginBottom: 28 }}>
-        <SpotlightCard className="metric-card interactive-card">
+      {/* Metric Strip (21st.dev High Data-Density Hairline Cards) */}
+      <div className="metric-strip" style={{ marginBottom: 32 }}>
+        <div className="metric-card">
           <div className="metric-card-label">Peer Mesh Quorum</div>
           <div className="metric-card-value">
-            <span className="mono-metric" style={{ color: "var(--status-nominal)" }}>
-              <AnimatedCounter value={3} /> / 3
+            <span className="mono-metric" style={{ color: "var(--text-primary)" }}>
+              <AnimatedCounter value={3} />
+              <span style={{ color: "var(--solar-terracotta)", fontWeight: 700 }}> / 3</span>
             </span>
             <span className="metric-card-unit">AMRs</span>
           </div>
           <div className="metric-card-subtext">Direct V2V peer mesh online</div>
-        </SpotlightCard>
+        </div>
 
-        <SpotlightCard className="metric-card interactive-card">
+        <div className="metric-card">
           <div className="metric-card-label">Choke Arbiter (C-14)</div>
           <div className="metric-card-value">
             <span
               className="mono-metric"
               style={{
-                color: reservation ? "var(--status-warning)" : "var(--status-nominal)",
+                color: reservation ? "var(--status-warning)" : "var(--solar-terracotta)",
+                fontSize: "19px",
+                letterSpacing: "0.02em",
               }}
             >
-              {reservation ? `LEASED [${reservation}]` : "OPEN"}
+              {reservation ? `LEASED [${reservation}]` : "OPEN // IDLE"}
             </span>
           </div>
           <div className="metric-card-subtext">Autonomous space-time mutex</div>
-        </SpotlightCard>
+        </div>
 
-        <SpotlightCard className="metric-card interactive-card">
+        <div className="metric-card">
           <div className="metric-card-label">P95 Decision Latency</div>
           <div className="metric-card-value">
             <span className="mono-metric" style={{ color: "var(--text-primary)" }}>
-              &lt; <AnimatedCounter value={42} />
+              &lt; <AnimatedCounter value={150} />
             </span>
             <span className="metric-card-unit">ms</span>
           </div>
-          <div className="metric-card-subtext">Zero cloud round-trip delay</div>
-        </SpotlightCard>
+          <div className="metric-card-subtext">~84ms observed on local LAN</div>
+        </div>
 
-        <SpotlightCard className="metric-card interactive-card">
-          <div className="metric-card-label">Safety Violations</div>
+        <div className="metric-card">
+          <div className="metric-card-label">Deadlocks &amp; Violations</div>
           <div className="metric-card-value">
-            <span className="mono-metric" style={{ color: "var(--status-nominal)" }}>
+            <span className="mono-metric" style={{ color: "var(--text-primary)" }}>
               <AnimatedCounter value={0} />
             </span>
             <span className="metric-card-unit">Events</span>
           </div>
-          <div className="metric-card-subtext">ISO 3691-4 Cat-3 verified</div>
-        </SpotlightCard>
+          <div className="metric-card-subtext">ISO 3691-4 envelope aligned</div>
+        </div>
       </div>
 
-      {/* Purpose-Built Industrial Hero Visual with Interactive Live Hotspots */}
-      <div
-        className="hero-visual-frame"
+      {/* Singular Hero Object: Warehouse Fleet Visual with Interactive Tactical Hotspots (Dali Agency 3D Container Scroll) */}
+      <ContainerScroll>
+        <div
+          className="hero-visual-frame card-hairline"
         style={{
           borderRadius: 12,
           overflow: "hidden",
-          border: "1px solid var(--border-tactical)",
-          boxShadow: "var(--shadow-elevated)",
-          backgroundColor: "var(--bg-elevated)",
+          boxShadow: "var(--shadow-card)",
           position: "relative",
         }}
       >
@@ -230,7 +247,7 @@ export function HeroSection({ reservation }: HeroSectionProps) {
             style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
           />
 
-          {/* Interactive Live Hotspots on the AMRs (Minimalist Tactical Pins) */}
+          {/* Interactive Live Hotspots on the AMRs */}
           {HERO_HOTSPOTS.map((hotspot) => {
             const isSelected = activeHotspot?.id === hotspot.id;
 
@@ -262,10 +279,10 @@ export function HeroSection({ reservation }: HeroSectionProps) {
                   <span className="hotspot-core" />
                 </button>
 
-                {/* Tactical Telemetry Popover */}
+                {/* Tactical Telemetry Popover (Dual Mode Optimized) */}
                 {isSelected && (
                   <div
-                    className="hero-hotspot-popover glass-panel"
+                    className="hero-hotspot-popover glass-panel card-hairline"
                     style={{
                       position: "absolute",
                       bottom: "135%",
@@ -275,6 +292,7 @@ export function HeroSection({ reservation }: HeroSectionProps) {
                       padding: "12px 14px",
                       borderRadius: 8,
                       zIndex: 20,
+                      boxShadow: "var(--shadow-elevated)",
                     }}
                   >
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
@@ -287,7 +305,7 @@ export function HeroSection({ reservation }: HeroSectionProps) {
                           fontSize: 9,
                           color:
                             hotspot.status === "leased"
-                              ? "var(--status-nominal)"
+                              ? "var(--solar-terracotta)"
                               : hotspot.status === "yielding"
                               ? "var(--status-warning)"
                               : "var(--text-muted)",
@@ -317,7 +335,7 @@ export function HeroSection({ reservation }: HeroSectionProps) {
           })}
         </div>
 
-        {/* Authoritative Fleet Status Strip (Cleanly Docked Directly Below Image) */}
+        {/* Docked Authoritative Fleet Status Strip */}
         <div
           style={{
             padding: "12px 20px",
@@ -326,13 +344,13 @@ export function HeroSection({ reservation }: HeroSectionProps) {
             justifyContent: "space-between",
             flexWrap: "wrap",
             gap: 12,
-            borderTop: "1px solid var(--border-tactical)",
+            borderTop: "1px solid var(--border-subtle)",
             backgroundColor: "var(--bg-surface)",
             fontSize: 12,
           }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <span style={{ width: 8, height: 8, borderRadius: "50%", backgroundColor: "var(--status-nominal)" }} />
+            <span style={{ width: 8, height: 8, borderRadius: "50%", backgroundColor: "var(--solar-terracotta)", boxShadow: "0 0 6px rgba(194, 84, 26, 0.4)" }} />
             <span style={{ fontWeight: 700, color: "var(--text-primary)", fontFamily: "var(--font-mono)" }}>
               PEER MESH ACTIVE // ZONE 02
             </span>
@@ -353,7 +371,7 @@ export function HeroSection({ reservation }: HeroSectionProps) {
             }}
           >
             <span>
-              Corridor C-14: <strong style={{ color: reservation ? "var(--status-warning)" : "var(--status-nominal)" }}>{reservation ? `LEASED [${reservation}]` : "FREE"}</strong>
+              Corridor C-14: <strong style={{ color: reservation ? "var(--status-warning)" : "var(--text-primary)" }}>{reservation ? `LEASED [${reservation}]` : "FREE // OPEN"}</strong>
             </span>
             <span>
               P95 Latency: <strong style={{ color: "var(--text-primary)" }}>&lt;42ms</strong>
@@ -364,6 +382,7 @@ export function HeroSection({ reservation }: HeroSectionProps) {
           </div>
         </div>
       </div>
+      </ContainerScroll>
     </section>
   );
 }

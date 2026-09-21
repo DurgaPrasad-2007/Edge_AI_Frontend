@@ -79,12 +79,12 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
               (function() {
                 try {
                   var stored = localStorage.getItem('edgefleet_theme');
-                  if (stored === 'dark' || stored === 'light') {
-                    document.documentElement.setAttribute('data-theme', stored);
-                  } else {
-                    var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-                    document.documentElement.setAttribute('data-theme', prefersDark ? 'dark' : 'light');
-                  }
+                  var theme = (stored === 'dark' || stored === 'light') 
+                    ? stored 
+                    : (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+                  document.documentElement.setAttribute('data-theme', theme);
+                  document.documentElement.classList.add(theme);
+                  document.documentElement.style.colorScheme = theme;
                 } catch(e) {}
               })();
             `,

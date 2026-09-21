@@ -21,17 +21,21 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     setMounted(true);
+    const applyTheme = (mode: ThemeMode) => {
+      setThemeState(mode);
+      document.documentElement.setAttribute("data-theme", mode);
+      document.documentElement.classList.toggle("dark", mode === "dark");
+      document.documentElement.classList.toggle("light", mode === "light");
+      document.documentElement.style.colorScheme = mode;
+    };
+
     const stored = localStorage.getItem("edgefleet_theme") as ThemeMode | null;
     if (stored === "light" || stored === "dark") {
-      setThemeState(stored);
-      document.documentElement.setAttribute("data-theme", stored);
+      applyTheme(stored);
     } else {
-      // Default is light theme as primary, but check if OS strongly prefers dark
       const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-      // Primary default is light-first unless user has explicit preference
       const initialMode: ThemeMode = prefersDark ? "dark" : "light";
-      setThemeState(initialMode);
-      document.documentElement.setAttribute("data-theme", initialMode);
+      applyTheme(initialMode);
     }
   }, []);
 
@@ -39,6 +43,9 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     setThemeState(mode);
     localStorage.setItem("edgefleet_theme", mode);
     document.documentElement.setAttribute("data-theme", mode);
+    document.documentElement.classList.toggle("dark", mode === "dark");
+    document.documentElement.classList.toggle("light", mode === "light");
+    document.documentElement.style.colorScheme = mode;
   };
 
   const toggleTheme = () => {

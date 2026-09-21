@@ -1,10 +1,44 @@
+"use client";
+
 import Link from "next/link";
-import { ShieldCheck, Cpu, Terminal, ExternalLink } from "lucide-react";
+import { ShieldCheck, ExternalLink } from "lucide-react";
 import { EdgeAiLogo } from "@/components/brand/edge-ai-logo";
+import { PerspectiveTicker } from "@/components/ui/perspective-ticker";
 
 export function Footer() {
   return (
     <footer className="site-footer" role="contentinfo">
+      {/* Dali Agency 3D Perspective Flipping Telemetry Ticker */}
+      <div
+        style={{
+          borderBottom: "1px solid var(--border-subtle)",
+          padding: "20px 24px",
+          maxWidth: 1400,
+          margin: "0 auto 32px",
+          width: "100%",
+          boxSizing: "border-box",
+        }}
+      >
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 16 }}>
+          <PerspectiveTicker />
+          <span
+            className="font-mono"
+            style={{
+              fontSize: 10.5,
+              color: "var(--text-muted)",
+              letterSpacing: "0.06em",
+              textTransform: "uppercase",
+              padding: "4px 8px",
+              borderRadius: 4,
+              background: "var(--bg-elevated)",
+              border: "1px solid var(--border-subtle)",
+            }}
+          >
+            SIH 2026 // PS-26123 // BEL BENCHMARK
+          </span>
+        </div>
+      </div>
+
       <div className="footer-container">
         {/* Column 1: Brand & Purpose */}
         <div>
@@ -15,9 +49,9 @@ export function Footer() {
             Decentralized peer-to-peer fleet coordination for autonomous mobile robots (AMRs) in high-density smart
             industrial warehouses. Eliminates single-point-of-failure dispatchers with sub-84ms local consensus.
           </p>
-          <div style={{ marginTop: 14, display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: "var(--text-muted)" }}>
-            <ShieldCheck className="w-4 h-4 text-emerald-600" />
-            <span>ISO 3691-4:2023 Compliant &middot; SIL-2 Zero-Motion API Observer</span>
+          <div style={{ marginTop: 14, display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: "var(--text-secondary)" }}>
+            <ShieldCheck className="w-4 h-4" style={{ color: "var(--solar-terracotta)" }} />
+            <span>Engineered to ISO 3691-4 clearance principles &middot; Zero-Motion API Observer</span>
           </div>
         </div>
 
@@ -55,7 +89,7 @@ export function Footer() {
           </ul>
         </div>
 
-        {/* Column 3: Documentation & Verification */}
+        {/* Column 3: Documentation & Review */}
         <div>
           <h3 style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--text-muted)", marginBottom: 14 }}>
             Documentation &amp; Review
@@ -125,7 +159,7 @@ export function Footer() {
           &copy; {new Date().getFullYear()} EdgeFleet Autonomous Systems &middot; Smart India Hackathon 2026 Problem Statement 26123.
         </div>
         <div className="font-mono" style={{ fontSize: 11, color: "var(--text-muted)" }}>
-          Evaluated for Bharat Electronics Limited (BEL) &middot; ISO 3691-4:2023 Safety Envelope Enforced
+          Evaluated for Bharat Electronics Limited (BEL) &middot; Engineered to ISO 3691-4 Clearance Principles
         </div>
       </div>
     </footer>

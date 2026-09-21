@@ -9,7 +9,7 @@ export type RobotState = {
   name: string;
   color: string;
   battery: number;
-  status: "Moving" | "Yielding" | "Rerouting" | "Task handoff" | "Charging";
+  status: "Idle" | "Moving" | "Yielding" | "Rerouting" | "Task handoff" | "Charging" | "Blocked";
   task: string;
   priority: number;
   path: Point[];
@@ -45,21 +45,21 @@ export const FLEET_PROFILES: Record<"alpha" | "beta" | "gamma", FleetMetadata> =
   },
   beta: {
     id: "beta",
-    name: "Fleet Beta · Agile Pickers",
-    role: "Rapid Kitting & Dynamic Aisle Replenishment",
-    zone: "Zone A-02 (Dynamic Racks)",
+    name: "Fleet Beta · Agile Picker",
+    role: "High-Frequency Bin Picking & Mutex Zone Crossing",
+    zone: "Zone B-04 (Corridor C-14 Mutex Spine)",
     color: "#F59E0B",
     robotCount: 1,
     totalPayloadKg: 350,
   },
   gamma: {
     id: "gamma",
-    name: "Fleet Gamma · Inbound Sorters",
-    role: "Autonomous Cross-Dock Tuggers & High-Speed Transit",
-    zone: "Zone B-01 (Inbound Docks)",
-    color: "#38BDF8",
+    name: "Fleet Gamma · Autonomous Tug",
+    role: "Perimeter Hauling & Dynamic Detouring (D* Lite Real-time)",
+    zone: "Zone C-01 (Highway Perimeter)",
+    color: "#06B6D4",
     robotCount: 1,
-    totalPayloadKg: 800,
+    totalPayloadKg: 600,
   },
 };
 
@@ -88,92 +88,10 @@ export type TaskRecord = {
   destination: string;
   priority: number;
   status: "Queued" | "Assigned" | "In Progress" | "Completed" | "Blocked";
+  payload_kg?: number;
+  payload_size?: "small" | "medium" | "heavy" | "pallet";
+  urgency?: "low" | "standard" | "critical";
   assigned_robot_id: RobotId | null;
   created_at: string;
-};
-
-export const DEFAULT_ROUTES: Record<RobotId, Point[]> = {
-  "AMR-01": [{ x: 102, y: 270 }, { x: 350, y: 270 }, { x: 500, y: 270 }, { x: 720, y: 270 }, { x: 900, y: 270 }],
-  "AMR-02": [{ x: 500, y: 85 }, { x: 500, y: 180 }, { x: 500, y: 270 }, { x: 500, y: 444 }, { x: 500, y: 540 }],
-  "AMR-03": [{ x: 900, y: 453 }, { x: 720, y: 453 }, { x: 650, y: 390 }, { x: 500, y: 390 }, { x: 280, y: 390 }, { x: 102, y: 390 }],
-};
-
-export const DEFAULT_DETOUR: Point[] = [
-  { x: 900, y: 453 },
-  { x: 720, y: 453 },
-  { x: 720, y: 505 },
-  { x: 280, y: 505 },
-  { x: 102, y: 390 },
-];
-
-export const initialFleetState: SimulationState = {
-  tick: 0,
-  running: false,
-  aisle_blocked: false,
-  reservation: null,
-  lease_until: 0,
-  completed_tasks: 0,
-  collision_count: 0,
-  messages: 0,
-  events: [
-    { time: "T+00.0s", type: "HEARTBEAT", message: "Mesh online | 3 peers discovered | direct local links healthy" },
-    { time: "T+00.6s", type: "INTENT", message: "Fleet initialized | Peer-to-peer consensus arbitration active" },
-  ],
-  robots: [
-    {
-      id: "AMR-01",
-      name: "Atlas",
-      color: "#10B981",
-      battery: 82,
-      status: "Moving",
-      task: "Pick P-17 -> Dock E",
-      priority: 71,
-      path: DEFAULT_ROUTES["AMR-01"],
-      path_index: 0,
-      progress: 0.15,
-      position: { x: 140, y: 270 },
-      completed: 12,
-      fleet_id: "alpha",
-      robot_class: "Heavy Pallet Lifter",
-      payload_capacity_kg: 1200,
-      max_speed_mps: 1.2,
-    },
-    {
-      id: "AMR-02",
-      name: "Nova",
-      color: "#F59E0B",
-      battery: 48,
-      status: "Moving",
-      task: "Replenish R-04",
-      priority: 91,
-      path: DEFAULT_ROUTES["AMR-02"],
-      path_index: 0,
-      progress: 0.2,
-      position: { x: 500, y: 120 },
-      completed: 10,
-      fleet_id: "beta",
-      robot_class: "Agile Tote Picker",
-      payload_capacity_kg: 350,
-      max_speed_mps: 1.8,
-    },
-    {
-      id: "AMR-03",
-      name: "Kite",
-      color: "#38BDF8",
-      battery: 67,
-      status: "Yielding",
-      task: "Pick P-23 -> Dock W",
-      priority: 63,
-      path: DEFAULT_ROUTES["AMR-03"],
-      path_index: 0,
-      progress: 0.1,
-      position: { x: 860, y: 453 },
-      completed: 11,
-      fleet_id: "alpha",
-      robot_class: "Autonomous Tugger",
-      payload_capacity_kg: 800,
-      max_speed_mps: 1.5,
-    },
-  ],
 };
 

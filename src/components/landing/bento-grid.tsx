@@ -45,20 +45,23 @@ export function BentoGrid() {
   const amr2Eta = (12 / amr2Speed).toFixed(1);
   const winner = parseFloat(amr1Eta) <= parseFloat(amr2Eta) ? "AMR-01" : "AMR-02";
 
-  // Safety Zone calculation for Tile 4
+  // Safety Zone calculation for Tile 4 (ISO 3691-4 clearance envelope principles)
   const safetyStatus =
     obstacleDistance < 0.5
-      ? { label: "CAT-3 E-STOP (RELAY OPEN)", color: "var(--status-critical)", state: "emergency" }
+      ? { label: "FAIL-SAFE HOLD (CLEARANCE VIOLATED)", color: "var(--status-critical)", state: "emergency" }
       : obstacleDistance <= 1.5
       ? { label: "CREEP SPEED (0.4 m/s)", color: "var(--status-warning)", state: "warning" }
       : { label: "FULL SPEED (1.8 m/s)", color: "var(--status-nominal)", state: "nominal" };
 
   return (
-    <section id="bento-architecture" className="content-section" style={{ paddingTop: 60, paddingBottom: 60 }}>
-      {/* Section Header */}
-      <div className="section-header">
+    <section id="bento-architecture" className="content-section" style={{ paddingTop: 50, paddingBottom: 50 }}>
+      {/* 21st.dev Section Header with Two-Tone Display Headline */}
+      <div className="section-header" style={{ marginBottom: 32 }}>
         <div className="section-kicker">Interactive Systems Intelligence</div>
-        <h2 className="section-title">De-Risking AMRs with Distributed Edge Compute</h2>
+        <h2 className="section-display-title">
+          <span className="text-display-muted">Interactive System Telemetry. </span>
+          <span className="text-display-emphasis">De-Risking Autonomous Fleet Compute.</span>
+        </h2>
         <p className="section-description">
           Experience the low-level mechanics of decentralized peer coordination. Interact with live corridor
           arbitration, test simulated cloud network outages, and inspect ROS 2 / Zenoh serialization benchmarks.
@@ -68,7 +71,7 @@ export function BentoGrid() {
       {/* Modern 3-Column Bento Grid */}
       <div className="bento-grid">
         {/* TILE 1: Dynamic Corridor Mutex Simulator (Spans 2 Columns on desktop) */}
-        <SpotlightCard className="bento-tile bento-tile-large">
+        <SpotlightCard className="bento-tile bento-tile-large card-hairline">
           <div className="bento-tile-header">
             <div className="bento-tile-badge">
               <Clock className="w-3.5 h-3.5 text-muted" />
@@ -84,7 +87,7 @@ export function BentoGrid() {
           </p>
 
           {/* Interactive Dual Velocity Sliders */}
-          <div className="interactive-slider-box">
+          <div className="interactive-slider-box card-hairline">
             <div className="slider-row">
               <div className="slider-meta">
                 <span className="slider-label">AMR-01 Approach Velocity</span>
@@ -128,7 +131,7 @@ export function BentoGrid() {
 
           {/* Live Dynamic Resolution Strip */}
           <div className="resolution-strip">
-            <div className="resolution-card winner-card">
+            <div className="resolution-card winner-card card-hairline">
               <div className="res-badge">LEASE GRANTED</div>
               <div className="res-name">{winner}</div>
               <div className="res-note">Proceeds through Corridor C-14 uninterrupted</div>
@@ -138,7 +141,7 @@ export function BentoGrid() {
               <ArrowRight className="w-5 h-5 text-muted" />
             </div>
 
-            <div className="resolution-card yield-card">
+            <div className="resolution-card yield-card card-hairline">
               <div className="res-badge">YIELD &amp; STAGE</div>
               <div className="res-name">{winner === "AMR-01" ? "AMR-02" : "AMR-01"}</div>
               <div className="res-note">Stages at Staging Waypoint W-14.2 (0 deadlock)</div>
@@ -147,7 +150,7 @@ export function BentoGrid() {
         </SpotlightCard>
 
         {/* TILE 2: Cloud Severance & Zero-Downtime Peer Mesh */}
-        <SpotlightCard className="bento-tile">
+        <SpotlightCard className="bento-tile card-hairline">
           <div className="bento-tile-header">
             <div className="bento-tile-badge">
               <Radio className="w-3.5 h-3.5 text-muted" />
@@ -189,7 +192,7 @@ export function BentoGrid() {
           </button>
 
           {/* Live Node Quorum State */}
-          <div className="network-state-box">
+          <div className="network-state-box card-hairline">
             <div className="net-row">
               <span className="net-label">Cloud Dispatcher:</span>
               <span className={`mono-metric ${cloudDisconnected ? "text-rose-500" : "text-emerald-500"}`}>
@@ -208,7 +211,7 @@ export function BentoGrid() {
         </SpotlightCard>
 
         {/* TILE 3: ROS 2 / Zenoh Binary Serialization Inspector */}
-        <SpotlightCard className="bento-tile">
+        <SpotlightCard className="bento-tile card-hairline">
           <div className="bento-tile-header">
             <div className="bento-tile-badge">
               <Cpu className="w-3.5 h-3.5 text-muted" />
@@ -240,7 +243,7 @@ export function BentoGrid() {
           </div>
 
           {/* Raw Packet Inspector Box */}
-          <div className="packet-inspector">
+          <div className="packet-inspector card-hairline">
             <div className="packet-inspector-header">
               <span>CDR Binary Payload Preview</span>
               <span className="mono-tag">
@@ -288,22 +291,22 @@ export function BentoGrid() {
         </SpotlightCard>
 
         {/* TILE 4: ISO 3691-4 Dynamic Lidar Safety Envelope */}
-        <SpotlightCard className="bento-tile bento-tile-large">
+        <SpotlightCard className="bento-tile bento-tile-large card-hairline">
           <div className="bento-tile-header">
             <div className="bento-tile-badge">
               <ShieldAlert className="w-3.5 h-3.5 text-muted" />
               <span>Safety Regulation</span>
             </div>
-            <span className="mono-tag">ISO 3691-4 / Cat 3</span>
+            <span className="mono-tag">ISO 3691-4 Principles</span>
           </div>
 
           <h3 className="bento-tile-title">Dynamic Radar &amp; Optical Safety Envelope</h3>
           <p className="bento-tile-desc">
             Drag the slider to bring a pedestrian or obstacle into the AMR&apos;s dynamic safety field. Observe how safety
-            relays transition from nominal velocity to creep speed to category-3 hardware stop.
+            logic transitions from nominal velocity to creep speed to fail-safe stop according to ISO 3691-4 0.5m lateral clearance principles.
           </p>
 
-          <div className="lidar-sim-box">
+          <div className="lidar-sim-box card-hairline">
             <div className="slider-row" style={{ marginBottom: 18 }}>
               <div className="slider-meta">
                 <span className="slider-label">Detected Obstacle Distance</span>
@@ -336,7 +339,7 @@ export function BentoGrid() {
                 <div className={`radar-concentric mid-zone ${obstacleDistance <= 1.5 && obstacleDistance >= 0.5 ? "active-zone" : ""}`}>
                   <span className="zone-label">0.5m-1.5m Creep Zone</span>
                   <div className={`radar-concentric inner-zone ${obstacleDistance < 0.5 ? "active-zone" : ""}`}>
-                    <span className="zone-label">&lt;0.5m E-Stop Ring</span>
+                    <span className="zone-label">&lt;0.5m Hold Zone</span>
                     <div className="amr-core-dot" />
                   </div>
                 </div>
@@ -348,7 +351,7 @@ export function BentoGrid() {
                   {safetyStatus.label}
                 </div>
                 <div className="safety-readout-sub">
-                  Dynamic Braking Curve: {obstacleDistance < 0.5 ? "0.0 m/s² (Hardware cut)" : obstacleDistance <= 1.5 ? "0.8 m/s² (Smooth de-cel)" : "Nominal cruising"}
+                  Dynamic Braking Curve: {obstacleDistance < 0.5 ? "0.0 m/s (Fail-safe hold active)" : obstacleDistance <= 1.5 ? "0.8 m/s² (Controlled creep)" : "Nominal cruising"}
                 </div>
               </div>
             </div>

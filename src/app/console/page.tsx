@@ -1,5 +1,2 @@
-import { FleetDashboard } from "@/components/fleet-dashboard";
-
-export default function ConsolePage() {
-  return <FleetDashboard />;
-}
+import { OverviewPanel } from "@/components/console/overview-panel";
+export default function ConsolePage() { return <OverviewPanel />; }

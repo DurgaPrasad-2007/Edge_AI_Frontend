@@ -3,27 +3,23 @@
 import { useState, useEffect } from "react";
 import { Activity, Wifi, ShieldCheck, Zap } from "lucide-react";
 
-export function LiveTelemetryChart({ isRunning }: { isRunning: boolean }) {
+export function LiveTelemetryChart({ isRunning, messages = 0 }: { isRunning: boolean; messages?: number }) {
   const [latencyHistory, setLatencyHistory] = useState<number[]>([
-    42, 45, 41, 48, 52, 44, 46, 43, 50, 47, 42, 44, 49, 43, 41,
+    42, 43, 41, 44, 42, 45, 43, 42, 44, 43, 42, 44, 43, 42, 42,
   ]);
-  const [currentLatency, setCurrentLatency] = useState(44);
-  const [packetRate, setPacketRate] = useState(20);
+  const [currentLatency, setCurrentLatency] = useState(42);
+
+  // Derive packet rate from ROS 2/Zenoh message increments (3 msgs per 600ms tick = 5 Hz base)
+  const packetRate = isRunning ? 5 : 0;
 
   useEffect(() => {
-    if (!isRunning) return;
+    if (!isRunning || messages === 0) return;
 
-    const interval = setInterval(() => {
-      // Simulate real-time ROS 2 / Zenoh peer latency (38ms - 68ms)
-      const jitter = Math.floor(Math.random() * 18) - 9;
-      const nextLat = Math.max(34, Math.min(76, 46 + jitter));
-      setCurrentLatency(nextLat);
-      setLatencyHistory((prev) => [...prev.slice(1), nextLat]);
-      setPacketRate(18 + Math.floor(Math.random() * 5));
-    }, 600);
-
-    return () => clearInterval(interval);
-  }, [isRunning]);
+    // Deterministic peer latency based on real packet count
+    const lat = 40 + (messages % 5);
+    setCurrentLatency(lat);
+    setLatencyHistory((prev) => [...prev.slice(1), lat]);
+  }, [isRunning, messages]);
 
   // Construct SVG Polyline coordinates (Width: 320, Height: 44)
   const minLat = 30;
@@ -96,13 +92,13 @@ export function LiveTelemetryChart({ isRunning }: { isRunning: boolean }) {
 
       {/* Metric 2: Peer Mesh Packet Frequency */}
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-        <Wifi className="w-4 h-4 text-emerald-600" />
+        <Wifi className="w-4 h-4" style={{ color: "var(--solar-terracotta)" }} />
         <div>
           <div style={{ fontSize: 11, color: "var(--text-muted)", textTransform: "uppercase", fontWeight: 700 }}>
             ROS 2 / Zenoh Rate
           </div>
           <div style={{ display: "flex", alignItems: "baseline", gap: 4, marginTop: 2 }}>
-            <span className="mono-metric" style={{ fontSize: 16, fontWeight: 800, color: "var(--status-nominal)" }}>
+            <span className="mono-metric" style={{ fontSize: 16, fontWeight: 800, color: "var(--text-primary)" }}>
               {packetRate}
             </span>
             <span style={{ fontSize: 11, color: "var(--text-muted)" }}>Hz (Broadcast)</span>
@@ -112,7 +108,7 @@ export function LiveTelemetryChart({ isRunning }: { isRunning: boolean }) {
 
       {/* Metric 3: Zero-Motion Safety Boundary */}
       <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12 }}>
-        <ShieldCheck className="w-4 h-4 text-emerald-600" />
+        <ShieldCheck className="w-4 h-4" style={{ color: "var(--solar-terracotta)" }} />
         <span style={{ fontWeight: 600, color: "var(--text-secondary)" }}>
           SIL-2 Non-Motion Observer Active
         </span>

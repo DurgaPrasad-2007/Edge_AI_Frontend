@@ -23,12 +23,12 @@ export function EventStream({ events }: { events: FleetEvent[] }) {
     >
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <Radio className="w-4 h-4 text-emerald-600" />
+          <Radio className="w-4 h-4" style={{ color: "var(--solar-terracotta)" }} />
           <strong style={{ fontSize: 13, color: "var(--text-primary)" }}>
             Replicated Peer Intent &amp; Lease Stream
           </strong>
         </div>
-        <span className="badge badge-nominal" style={{ fontSize: 10 }}>
+        <span className="badge badge-active" style={{ fontSize: 10 }}>
           ROS 2 / ZENOH DDS MESH
         </span>
       </div>

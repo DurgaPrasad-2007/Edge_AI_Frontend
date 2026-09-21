@@ -58,7 +58,7 @@ export function SimulatorControls({
           <button
             type="button"
             onClick={onToggleRadar}
-            className={`btn ${showRadar ? "btn-nominal" : "btn-secondary"}`}
+            className={`btn ${showRadar ? "btn-active-toggle" : "btn-secondary"}`}
             style={{ padding: "5px 10px", fontSize: 11 }}
             title="Toggle 360 Radar Sweep Beam"
           >
@@ -72,7 +72,7 @@ export function SimulatorControls({
           <button
             type="button"
             onClick={onToggleHeatmap}
-            className={`btn ${showHeatmap ? "btn-nominal" : "btn-secondary"}`}
+            className={`btn ${showHeatmap ? "btn-active-toggle" : "btn-secondary"}`}
             style={{ padding: "5px 10px", fontSize: 11 }}
             title="Toggle Traffic Congestion Heatmap"
           >

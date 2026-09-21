@@ -2,10 +2,14 @@ import { Cpu, Zap, HardDrive, Wifi, Shield } from "lucide-react";
 
 export function BenchmarkSection() {
   return (
-    <section id="benchmarks" className="content-section">
-      <div className="section-header">
+    <section id="benchmarks" className="content-section" style={{ paddingTop: 40, paddingBottom: 40 }}>
+      {/* 21st.dev Section Header with Two-Tone Display Headline */}
+      <div className="section-header" style={{ marginBottom: 32 }}>
         <div className="section-kicker">Empirical Performance Evaluation</div>
-        <h2 className="section-title">Controlled Workload Benchmark</h2>
+        <h2 className="section-display-title">
+          <span className="text-display-muted">Controlled Workload Benchmarks. </span>
+          <span className="text-display-emphasis">+27.3% Throughput Gain.</span>
+        </h2>
         <p className="section-description">
           Performance recorded across identical 3-AMR overlapping pick-and-place routes. Compared against
           traditional centralized stop-and-wait dispatchers under high aisle contention.
@@ -13,7 +17,7 @@ export function BenchmarkSection() {
       </div>
 
       {/* Benchmark Comparison Table */}
-      <div className="data-table-container" style={{ marginBottom: 36 }}>
+      <div className="data-table-container card-hairline" style={{ marginBottom: 36, overflow: "hidden" }}>
         <table className="data-table">
           <thead>
             <tr>
@@ -27,61 +31,60 @@ export function BenchmarkSection() {
             <tr>
               <td><strong>Total Workload Makespan</strong></td>
               <td><span className="mono-metric" style={{ color: "var(--status-danger)" }}>10 min 30 s</span></td>
-              <td><span className="mono-metric" style={{ color: "var(--status-nominal)", fontWeight: 700 }}>7 min 38 s</span></td>
-              <td><span className="badge badge-nominal">+27.3% Throughput</span></td>
+              <td><span className="mono-metric" style={{ color: "var(--solar-terracotta)", fontWeight: 700 }}>7 min 38 s</span></td>
+              <td><span className="badge badge-active">+27.3% Throughput</span></td>
             </tr>
             <tr>
               <td><strong>Conflict Decision Latency</strong></td>
               <td><span className="mono-metric" style={{ color: "var(--status-danger)" }}>450 - 1,200 ms (Cloud roundtrip)</span></td>
-              <td><span className="mono-metric" style={{ color: "var(--status-nominal)", fontWeight: 700 }}>&lt; 84 ms (Direct LAN V2V)</span></td>
-              <td><span className="badge badge-nominal">10x Lower Latency</span></td>
+              <td><span className="mono-metric" style={{ color: "var(--solar-terracotta)", fontWeight: 700 }}>p95 &lt; 150 ms (~84 ms observed on LAN)</span></td>
+              <td><span className="badge badge-active">Target Met</span></td>
             </tr>
             <tr>
               <td><strong>Single Point of Failure (SPOF)</strong></td>
               <td><span style={{ color: "var(--status-danger)" }}>Central controller offline = All AMRs freeze</span></td>
-              <td><span style={{ color: "var(--status-nominal)", fontWeight: 700 }}>Zero SPOF (Autonomous peer quorum)</span></td>
-              <td><span className="badge badge-nominal">100% Resilience</span></td>
+              <td><span style={{ color: "var(--solar-terracotta)", fontWeight: 700 }}>Zero SPOF (Autonomous peer quorum)</span></td>
+              <td><span className="badge badge-active">100% Resilience</span></td>
             </tr>
             <tr>
               <td><strong>Aisle Blockage Recovery Time</strong></td>
               <td><span className="mono-metric" style={{ color: "var(--status-warning)" }}>Manual operator reroute (~180 s)</span></td>
-              <td><span className="mono-metric" style={{ color: "var(--status-nominal)", fontWeight: 700 }}>Autonomous detouring (&lt; 1.2 s)</span></td>
-              <td><span className="badge badge-nominal">Instantaneous Recovery</span></td>
+              <td><span className="mono-metric" style={{ color: "var(--solar-terracotta)", fontWeight: 700 }}>Autonomous detouring (&lt; 1.2 s)</span></td>
+              <td><span className="badge badge-active">Instantaneous Recovery</span></td>
             </tr>
             <tr>
               <td><strong>Collision Count</strong></td>
               <td><span className="mono-metric">0 (with excessive conservative stops)</span></td>
-              <td><span className="mono-metric" style={{ color: "var(--status-nominal)", fontWeight: 700 }}>0 (with dynamic space-time efficiency)</span></td>
-              <td><span className="badge badge-nominal">Zero Safety Compromise</span></td>
+              <td><span className="mono-metric" style={{ color: "var(--solar-terracotta)", fontWeight: 700 }}>0 (with dynamic space-time efficiency)</span></td>
+              <td><span className="badge badge-active">Zero Safety Compromise</span></td>
             </tr>
           </tbody>
         </table>
       </div>
 
       {/* Hardware & Edge Specifications */}
-      <div id="specs" style={{ marginTop: 24 }}>
-        <div className="section-header">
+      <div id="specs" style={{ marginTop: 28 }}>
+        <div className="section-header" style={{ marginBottom: 24 }}>
           <div className="section-kicker">Hardware &amp; Edge Architecture</div>
-          <h3 style={{ fontSize: 20, fontWeight: 700, color: "var(--text-primary)", marginBottom: 8 }}>
-            Onboard AMR Edge Compute Specification (SWaP-C)
+          <h3 className="section-display-title" style={{ fontSize: "1.5rem" }}>
+            <span className="text-display-muted">Onboard AMR Compute. </span>
+            <span className="text-display-emphasis">SWaP-C Specification.</span>
           </h3>
-          <p style={{ fontSize: 13, color: "var(--text-secondary)" }}>
+          <p className="section-description">
             Engineered for Size, Weight, Power, and Cost (SWaP-C) constraints of industrial driverless trucks.
           </p>
         </div>
 
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 16, marginBottom: 28 }}>
           <div
+            className="card-hairline"
             style={{
-              backgroundColor: "var(--bg-surface)",
-              border: "1px solid var(--border-tactical)",
-              borderRadius: 8,
-              padding: "18px",
+              padding: "20px",
             }}
           >
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
               <Cpu className="w-4 h-4 text-blue-600" />
-              <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", color: "var(--text-muted)" }}>
+              <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", color: "var(--text-muted)", letterSpacing: "0.04em" }}>
                 Compute Engine
               </span>
             </div>
@@ -92,16 +95,14 @@ export function BenchmarkSection() {
           </div>
 
           <div
+            className="card-hairline"
             style={{
-              backgroundColor: "var(--bg-surface)",
-              border: "1px solid var(--border-tactical)",
-              borderRadius: 8,
-              padding: "18px",
+              padding: "20px",
             }}
           >
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-              <Wifi className="w-4 h-4 text-emerald-600" />
-              <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", color: "var(--text-muted)" }}>
+              <Wifi className="w-4 h-4" style={{ color: "var(--solar-terracotta)" }} />
+              <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", color: "var(--text-muted)", letterSpacing: "0.04em" }}>
                 Middleware Transport
               </span>
             </div>
@@ -112,16 +113,14 @@ export function BenchmarkSection() {
           </div>
 
           <div
+            className="card-hairline"
             style={{
-              backgroundColor: "var(--bg-surface)",
-              border: "1px solid var(--border-tactical)",
-              borderRadius: 8,
-              padding: "18px",
+              padding: "20px",
             }}
           >
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
               <Zap className="w-4 h-4 text-amber-600" />
-              <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", color: "var(--text-muted)" }}>
+              <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", color: "var(--text-muted)", letterSpacing: "0.04em" }}>
                 Sensor Fusion
               </span>
             </div>
@@ -132,16 +131,14 @@ export function BenchmarkSection() {
           </div>
 
           <div
+            className="card-hairline"
             style={{
-              backgroundColor: "var(--bg-surface)",
-              border: "1px solid var(--border-tactical)",
-              borderRadius: 8,
-              padding: "18px",
+              padding: "20px",
             }}
           >
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
               <HardDrive className="w-4 h-4 text-purple-600" />
-              <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", color: "var(--text-muted)" }}>
+              <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", color: "var(--text-muted)", letterSpacing: "0.04em" }}>
                 Audit Storage &amp; RAG
               </span>
             </div>
@@ -154,10 +151,10 @@ export function BenchmarkSection() {
 
         {/* Purpose-Built Image: Onboard Edge Compute Module */}
         <div
+          className="card-hairline"
           style={{
             borderRadius: 8,
             overflow: "hidden",
-            border: "1px solid var(--border-tactical)",
             boxShadow: "var(--shadow-subtle)",
             backgroundColor: "var(--bg-elevated)",
           }}

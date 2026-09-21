@@ -22,43 +22,43 @@ export interface ColorTokens {
 }
 
 export const LIGHT_THEME: ColorTokens = {
-  bgBase: "#F8FAFC",
-  bgSurface: "#FFFFFF",
-  bgElevated: "#F1F5F9",
-  bgMuted: "#E2E8F0",
-  borderSubtle: "#E2E8F0",
-  borderTactical: "#CBD5E1",
-  borderFocus: "#0284C7",
-  textPrimary: "#0F172A",
-  textSecondary: "#475569",
-  textMuted: "#64748B",
-  statusNominal: "#059669",
-  statusNominalTint: "#ECFDF5",
-  statusWarning: "#D97706",
-  statusWarningTint: "#FFFBEB",
-  statusActive: "#2563EB",
-  statusActiveTint: "#EFF6FF",
+  bgBase: "#FAF8F5", // Solar Dusk Light Canvas
+  bgSurface: "#F5F2EC", // Solar Dusk Light Surface
+  bgElevated: "#ECE5DA",
+  bgMuted: "#EFE9E0",
+  borderSubtle: "#E2DACD",
+  borderTactical: "#D4C9B8",
+  borderFocus: "#C2541A",
+  textPrimary: "#38302A",
+  textSecondary: "#6E6359",
+  textMuted: "#94887C",
+  statusNominal: "#16A34A",
+  statusNominalTint: "#F0FDF4",
+  statusWarning: "#C2541A",
+  statusWarningTint: "#FFF7ED",
+  statusActive: "#C2541A", // Solar Dusk Terracotta
+  statusActiveTint: "#FFEDD5",
   statusDanger: "#DC2626",
   statusDangerTint: "#FEF2F2",
 };
 
 export const DARK_THEME: ColorTokens = {
-  bgBase: "#0B0F19",
-  bgSurface: "#111827",
-  bgElevated: "#1F2937",
-  bgMuted: "#374151",
-  borderSubtle: "rgba(255, 255, 255, 0.08)",
-  borderTactical: "rgba(56, 189, 248, 0.20)",
-  borderFocus: "#38BDF8",
-  textPrimary: "#F9FAFB",
-  textSecondary: "#9CA3AF",
-  textMuted: "#6B7280",
-  statusNominal: "#10B981",
-  statusNominalTint: "rgba(16, 185, 129, 0.15)",
-  statusWarning: "#F59E0B",
-  statusWarningTint: "rgba(245, 158, 11, 0.15)",
-  statusActive: "#38BDF8",
-  statusActiveTint: "rgba(56, 189, 248, 0.15)",
+  bgBase: "#1B1715", // Solar Dusk Dark Canvas (Twilight Umber)
+  bgSurface: "#241F1C", // Solar Dusk Dark Surface (Obsidian Dusk)
+  bgElevated: "#2D2723",
+  bgMuted: "#2E2723",
+  borderSubtle: "rgba(220, 200, 180, 0.12)",
+  borderTactical: "rgba(242, 108, 42, 0.25)",
+  borderFocus: "#F26C2A",
+  textPrimary: "#F6F4F2", // Star-White
+  textSecondary: "#C8BEB5",
+  textMuted: "#A29B94",
+  statusNominal: "#34D399",
+  statusNominalTint: "rgba(52, 211, 153, 0.15)",
+  statusWarning: "#F26C2A",
+  statusWarningTint: "rgba(242, 108, 42, 0.15)",
+  statusActive: "#F26C2A", // Solar Dusk Sunset Orange
+  statusActiveTint: "rgba(242, 108, 42, 0.18)",
   statusDanger: "#EF4444",
   statusDangerTint: "rgba(239, 68, 68, 0.15)",
 };

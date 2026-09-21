@@ -167,7 +167,7 @@ export function TelemetryPanel({
       {/* 3. Safety Envelope Verification */}
       <div className="sidebar-panel">
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <ShieldCheck className="w-4 h-4 text-emerald-600" />
+          <ShieldCheck className="w-4 h-4" style={{ color: "var(--solar-terracotta)" }} />
           <span style={{ fontSize: 12, fontWeight: 700, color: "var(--text-primary)" }}>
             ISO 3691-4:2023 Safety
           </span>
