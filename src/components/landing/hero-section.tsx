@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { Terminal, Copy, Check, ShieldCheck, Radio, ArrowRight } from "lucide-react";
 import type { RobotId } from "@/lib/fleet-contract";
+import { useFleetSocket } from "@/lib/use-fleet-socket";
 import { AnimatedCounter } from "@/components/ui/animated-counter";
 import { ContainerScroll } from "@/components/ui/container-scroll";
 import { playClick, playChirp } from "@/lib/sound-effects";
@@ -21,51 +22,53 @@ interface Hotspot {
   status: "nominal" | "leased" | "yielding";
   speed: string;
   battery: string;
-  computeLoad: string;
+  load: string;
   note: string;
 }
 
-const HERO_HOTSPOTS: Hotspot[] = [
-  {
-    id: "amr-14",
-    name: "AMR-01 (Unit 14)",
-    role: "Pallet Transport AMR",
-    xPercent: 52,
-    yPercent: 68,
-    status: "leased",
-    speed: "1.4 m/s",
-    battery: "88.4%",
-    computeLoad: "12% (Jetson Orin)",
-    note: "Holding Space-Time Lease for Corridor C-14. Trajectory verified clear.",
-  },
-  {
-    id: "corridor-c14",
-    name: "Corridor C-14 Mutex Zone",
-    role: "Single-Lane Chokepoint",
-    xPercent: 67,
-    yPercent: 58,
-    status: "nominal",
-    speed: "N/A",
-    battery: "Grid Powered",
-    computeLoad: "Distributed V2V",
-    note: "Decentralized space-time exclusion envelope. Prevents head-on deadlock.",
-  },
-  {
-    id: "amr-courier",
-    name: "AMR-02 (Unit 08)",
-    role: "High-Speed Courier",
-    xPercent: 84,
-    yPercent: 64,
-    status: "yielding",
-    speed: "0.0 m/s (Yielding)",
-    battery: "94.1%",
-    computeLoad: "9% (RPi 5)",
-    note: "Safely staged at Standby Waypoint. Will enter corridor after AMR-01 clears.",
-  },
+// Pin anchors on the hero photograph; everything shown in the popovers comes from live backend state.
+const PIN_ANCHORS = [
+  { x: 52, y: 68 },
+  { x: 67, y: 58 },
+  { x: 84, y: 64 },
 ];
 
 export function HeroSection({ reservation }: HeroSectionProps) {
-  const [activeHotspot, setActiveHotspot] = useState<Hotspot | null>(null);
+  const { robots, world, fleetState, kpis, isConnected } = useFleetSocket();
+  const [activeHotspotId, setActiveHotspotId] = useState<string | null>(null);
+  const zoneId = world?.mutex_zones[0] ?? "Mutex zone";
+  const zoneLabel = world?.nodes.find((n) => n.id === zoneId)?.label ?? zoneId;
+  const operational = robots.filter((r) => r.status !== "Blocked" && r.battery > 10).length;
+
+  const robotPins: Hotspot[] = robots.slice(0, 2).map((r, i) => ({
+    id: r.id,
+    name: `${r.id} (${r.name})`,
+    role: `${r.payload_capacity_kg ?? "?"} kg class AMR`,
+    xPercent: PIN_ANCHORS[i === 0 ? 0 : 2].x,
+    yPercent: PIN_ANCHORS[i === 0 ? 0 : 2].y,
+    status: reservation === r.id ? "leased" : r.status === "Yielding" ? "yielding" : "nominal",
+    speed: r.status,
+    battery: `${r.battery.toFixed(1)}%`,
+    load: `${r.current_payload_kg ?? 0} / ${r.payload_capacity_kg ?? "?"} kg`,
+    note: r.task,
+  }));
+  const zonePin: Hotspot[] = world
+    ? [{
+        id: zoneId,
+        name: `${zoneLabel} Mutex Zone`,
+        role: "Single-lane chokepoint",
+        xPercent: PIN_ANCHORS[1].x,
+        yPercent: PIN_ANCHORS[1].y,
+        status: reservation ? "leased" : "nominal",
+        speed: "n/a",
+        battery: "n/a",
+        load: "n/a",
+        note: reservation ? `Lease held by ${reservation}. Other AMRs wait at the hold points.` : "Zone is free; the next AMR to arrive is granted the lease.",
+      }]
+    : [];
+  const hotspots = [...robotPins, ...zonePin];
+  const activeHotspot = hotspots.find((h) => h.id === activeHotspotId) ?? null;
+  const setActiveHotspot = (h: Hotspot | null) => setActiveHotspotId(h ? h.id : null);
   const [copiedCli, setCopiedCli] = useState(false);
 
   const cliCommand = "zenoh-bridge-ros2dds -c /etc/edgefleet/mesh.json5";
@@ -178,19 +181,19 @@ export function HeroSection({ reservation }: HeroSectionProps) {
       {/* Metric Strip (21st.dev High Data-Density Hairline Cards) */}
       <div className="metric-strip" style={{ marginBottom: 32 }}>
         <div className="metric-card">
-          <div className="metric-card-label">Peer Mesh Quorum</div>
+          <div className="metric-card-label">Fleet Online</div>
           <div className="metric-card-value">
             <span className="mono-metric" style={{ color: "var(--text-primary)" }}>
-              <AnimatedCounter value={3} />
-              <span style={{ color: "var(--solar-terracotta)", fontWeight: 700 }}> / 3</span>
+              <AnimatedCounter value={operational} />
+              <span style={{ color: "var(--solar-terracotta)", fontWeight: 700 }}> / {robots.length}</span>
             </span>
             <span className="metric-card-unit">AMRs</span>
           </div>
-          <div className="metric-card-subtext">Direct V2V peer mesh online</div>
+          <div className="metric-card-subtext">{isConnected ? "Operational (not blocked, battery > 10%)" : "Backend offline"}</div>
         </div>
 
         <div className="metric-card">
-          <div className="metric-card-label">Choke Arbiter (C-14)</div>
+          <div className="metric-card-label">Choke Arbiter ({zoneId})</div>
           <div className="metric-card-value">
             <span
               className="mono-metric"
@@ -203,29 +206,29 @@ export function HeroSection({ reservation }: HeroSectionProps) {
               {reservation ? `LEASED [${reservation}]` : "OPEN // IDLE"}
             </span>
           </div>
-          <div className="metric-card-subtext">Autonomous space-time mutex</div>
+          <div className="metric-card-subtext">Corridor lease, granted by peer score</div>
         </div>
 
         <div className="metric-card">
-          <div className="metric-card-label">P95 Decision Latency</div>
+          <div className="metric-card-label">Missions Completed</div>
           <div className="metric-card-value">
             <span className="mono-metric" style={{ color: "var(--text-primary)" }}>
-              &lt; <AnimatedCounter value={150} />
+              <AnimatedCounter value={kpis.completedTotal} />
             </span>
-            <span className="metric-card-unit">ms</span>
+            <span className="metric-card-unit">tasks</span>
           </div>
-          <div className="metric-card-subtext">~84ms observed on local LAN</div>
+          <div className="metric-card-subtext">{kpis.queuedTasks} queued &middot; {kpis.tasksPerHour}/h this session</div>
         </div>
 
         <div className="metric-card">
-          <div className="metric-card-label">Deadlocks &amp; Violations</div>
+          <div className="metric-card-label">Proximity Violations</div>
           <div className="metric-card-value">
-            <span className="mono-metric" style={{ color: "var(--text-primary)" }}>
-              <AnimatedCounter value={0} />
+            <span className="mono-metric" style={{ color: kpis.collisionCount > 0 ? "var(--status-danger)" : "var(--text-primary)" }}>
+              <AnimatedCounter value={kpis.collisionCount} />
             </span>
             <span className="metric-card-unit">Events</span>
           </div>
-          <div className="metric-card-subtext">ISO 3691-4 envelope aligned</div>
+          <div className="metric-card-subtext">Measured every control tick</div>
         </div>
       </div>
 
@@ -248,7 +251,7 @@ export function HeroSection({ reservation }: HeroSectionProps) {
           />
 
           {/* Interactive Live Hotspots on the AMRs */}
-          {HERO_HOTSPOTS.map((hotspot) => {
+          {hotspots.map((hotspot) => {
             const isSelected = activeHotspot?.id === hotspot.id;
 
             return (
@@ -320,9 +323,9 @@ export function HeroSection({ reservation }: HeroSectionProps) {
                     </div>
 
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, fontSize: 10.5, fontFamily: "var(--font-mono)", marginBottom: 8 }}>
-                      <div>Speed: <strong style={{ color: "var(--text-primary)" }}>{hotspot.speed}</strong></div>
+                      <div>State: <strong style={{ color: "var(--text-primary)" }}>{hotspot.speed}</strong></div>
                       <div>Battery: <strong style={{ color: "var(--text-primary)" }}>{hotspot.battery}</strong></div>
-                      <div style={{ gridColumn: "span 2" }}>Compute: <strong style={{ color: "var(--text-primary)" }}>{hotspot.computeLoad}</strong></div>
+                      <div style={{ gridColumn: "span 2" }}>Payload: <strong style={{ color: "var(--text-primary)" }}>{hotspot.load}</strong></div>
                     </div>
 
                     <p style={{ fontSize: 11, color: "var(--text-secondary)", lineHeight: 1.35, margin: 0 }}>
@@ -352,10 +355,10 @@ export function HeroSection({ reservation }: HeroSectionProps) {
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <span style={{ width: 8, height: 8, borderRadius: "50%", backgroundColor: "var(--solar-terracotta)", boxShadow: "0 0 6px rgba(194, 84, 26, 0.4)" }} />
             <span style={{ fontWeight: 700, color: "var(--text-primary)", fontFamily: "var(--font-mono)" }}>
-              PEER MESH ACTIVE // ZONE 02
+              {isConnected ? "COORDINATOR ONLINE" : "BACKEND OFFLINE"} // {fleetState?.running ? "RUNNING" : "PAUSED"}
             </span>
             <span style={{ color: "var(--text-muted)", fontSize: 11.5 }}>
-              Direct peer coordination across 3 industrial AMRs
+              {robots.length} AMRs registered &middot; tick {fleetState?.tick ?? 0}
             </span>
           </div>
 
@@ -371,13 +374,10 @@ export function HeroSection({ reservation }: HeroSectionProps) {
             }}
           >
             <span>
-              Corridor C-14: <strong style={{ color: reservation ? "var(--status-warning)" : "var(--text-primary)" }}>{reservation ? `LEASED [${reservation}]` : "FREE // OPEN"}</strong>
+              {zoneLabel}: <strong style={{ color: reservation ? "var(--status-warning)" : "var(--text-primary)" }}>{reservation ? `LEASED [${reservation}]` : "FREE // OPEN"}</strong>
             </span>
             <span>
-              P95 Latency: <strong style={{ color: "var(--text-primary)" }}>&lt;42ms</strong>
-            </span>
-            <span>
-              Hardware: <strong style={{ color: "var(--text-primary)" }}>RPi 5 / Jetson Orin</strong>
+              Peer packets: <strong style={{ color: "var(--text-primary)" }}>{fleetState?.messages ?? 0}</strong>
             </span>
           </div>
         </div>

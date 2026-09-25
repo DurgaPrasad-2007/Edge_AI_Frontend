@@ -1,139 +1,83 @@
 "use client";
 
-import { useState } from "react";
-import { Search, Database, FileText, CheckCircle2 } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { Search, Database, FileText } from "lucide-react";
 
 interface VectorResult {
   id: string;
   source_name: string;
   content: string;
-  similarity?: number;
+  similarity?: number | null;
 }
 
-const FALLBACK_RESULTS: Record<string, VectorResult[]> = {
-  "Corridor C-14 choke point arbitration": [
-    {
-      id: "sop-01",
-      source_name: "SOP-W2-104 // Intersection Lease Arbitration",
-      content:
-        "When two or more AMRs approach Corridor C-14 within 5m, the peer arbiter evaluates composite utility U(r, t) = Priority*1.0 + (100 - Battery)*0.2. Highest scorer is granted an exclusive 4.8s time-space lease. Approaching AMRs must yield at holding point WP-04 or WP-09.",
-      similarity: 0.942,
-    },
-    {
-      id: "sop-02",
-      source_name: "ENG-STD-3691 // Spatial Mutex Lock Protocol",
-      content:
-        "Single-lane transit aisles are declared non-divisible spatial mutex cells. Mutual exclusion is guaranteed via broadcast lease confirmation over ROS 2 peer mesh before physical boundary entry.",
-      similarity: 0.887,
-    },
-  ],
-  "Aisle B-07 obstacle detour SOP": [
-    {
-      id: "sop-03",
-      source_name: "SOP-W2-208 // Dynamic Obstacle Invalidation",
-      content:
-        "Upon LiDAR detection of a static obstacle exceeding 1.5s in Aisle B-07, the detecting AMR publishes an OBSTACLE_BROADCAST packet. Pathfinding engines invalidate Corridor B-07 and reroute across South Perimeter highway P-2 within 42ms.",
-      similarity: 0.958,
-    },
-    {
-      id: "sop-04",
-      source_name: "AUCTION-SPEC-09 // Task Re-bidding Trigger",
-      content:
-        "If a detour increases transit distance by >40%, the affected AMR triggers a localized Contract-Net task auction. Peer robots with lower estimated completion makespan bid to take over delivery at the nearest transfer bay.",
-      similarity: 0.891,
-    },
-  ],
-  "Low battery autonomous docking": [
-    {
-      id: "sop-05",
-      source_name: "SOP-BAT-012 // Critical State of Charge Protocol",
-      content:
-        "AMRs reaching state of charge <= 20% immediately transition to CHARGING_REQUIRED state. In-flight low-priority tasks are relinquished to Contract-Net auction. AMR autonomously reserves charging slot 1, 2, or 3 in the South Charging Bay.",
-      similarity: 0.963,
-    },
-  ],
-  "Zero-motion safety boundary": [
-    {
-      id: "sop-06",
-      source_name: "SAFE-SIL2-001 // Software Observer Independence",
-      content:
-        "Web dispatch consoles, REST APIs, and vector databases operate as read-only telemetry observers. Under no circumstances may an external network packet issue direct actuator or motor commands. Actuator loops are hard-isolated to onboard certified safety microcontrollers.",
-      similarity: 0.978,
-    },
-  ],
-};
+const apiBase = process.env.NEXT_PUBLIC_EDGE_API_BASE_URL ?? "http://localhost:8000";
+
+// Example queries only; results always come from the backend's knowledge table.
+const QUICK_QUERIES = [
+  "Corridor C-14 choke point arbitration",
+  "Aisle B-07 obstacle detour",
+  "Low battery autonomous docking",
+  "Zero-motion safety boundary",
+];
 
 export function RagSearch() {
-  const [query, setQuery] = useState("Corridor C-14 choke point arbitration");
+  const [query, setQuery] = useState(QUICK_QUERIES[0]);
   const [loading, setLoading] = useState(false);
-  const [results, setResults] = useState<VectorResult[]>(
-    FALLBACK_RESULTS["Corridor C-14 choke point arbitration"]
-  );
+  const [results, setResults] = useState<VectorResult[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [latencyMs, setLatencyMs] = useState<number | null>(null);
 
-  const handleSearch = async (q: string) => {
+  const handleSearch = useCallback(async (q: string) => {
     setLoading(true);
     setQuery(q);
+    setError(null);
+    const started = performance.now();
     try {
-      const apiBase = process.env.NEXT_PUBLIC_EDGE_API_BASE_URL ?? "http://localhost:8000";
       const res = await fetch(`${apiBase}/api/knowledge/query`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ query: q, limit: 3 }),
       });
-      if (res.ok) {
-        const data = await res.json();
-        setResults(data);
-      } else {
-        setResults(FALLBACK_RESULTS[q] || FALLBACK_RESULTS["Corridor C-14 choke point arbitration"]);
-      }
-    } catch {
-      setResults(FALLBACK_RESULTS[q] || FALLBACK_RESULTS["Corridor C-14 choke point arbitration"]);
+      if (!res.ok) throw new Error(`Knowledge search failed (HTTP ${res.status})`);
+      setResults((await res.json()) as VectorResult[]);
+      setLatencyMs(Math.round(performance.now() - started));
+    } catch (err) {
+      setResults([]);
+      setLatencyMs(null);
+      setError(err instanceof Error && err.message.startsWith("Knowledge") ? err.message : "Backend unreachable — knowledge base unavailable");
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    void handleSearch(QUICK_QUERIES[0]);
+  }, [handleSearch]);
 
   return (
-    <div
-      style={{
-        backgroundColor: "var(--bg-surface)",
-        border: "1px solid var(--border-tactical)",
-        borderRadius: 8,
-        padding: "24px",
-        marginTop: 24,
-        boxShadow: "var(--shadow-card)",
-      }}
-    >
+    <div style={{ backgroundColor: "var(--bg-surface)", border: "1px solid var(--border-tactical)", borderRadius: 8, padding: "24px", marginTop: 24, boxShadow: "var(--shadow-card)" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 12, marginBottom: 16 }}>
         <div>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
             <Database className="w-4 h-4" style={{ color: "var(--solar-terracotta)" }} />
             <span className="font-mono" style={{ fontSize: 11, fontWeight: 700, color: "var(--solar-terracotta)", letterSpacing: "0.05em" }}>
-              POSTGRESQL + PGVECTOR / HNSW INDEX
+              VECTOR KNOWLEDGE BASE
             </span>
           </div>
-          <h3 style={{ fontSize: 16, fontWeight: 700, color: "var(--text-primary)" }}>
-            Autonomous Incident &amp; SOP Vector Knowledge Base
-          </h3>
+          <h3 style={{ fontSize: 16, fontWeight: 700, color: "var(--text-primary)" }}>Incident &amp; SOP Knowledge Base</h3>
           <p style={{ fontSize: 13, color: "var(--text-secondary)", marginTop: 2 }}>
-            Indexed with 384-dimensional cosine embeddings. Query incident recovery and arbitration procedures in real time.
+            384-dimensional hashed bag-of-words embeddings, ranked by cosine similarity. Lexical matching: queries share vocabulary with the SOP text.
           </p>
         </div>
 
         <div style={{ display: "flex", gap: 8 }}>
-          <span className="badge badge-nominal">pgvector (HNSW)</span>
-          <span className="badge badge-active">&lt;15ms Latency</span>
+          <span className="badge badge-nominal">cosine search</span>
+          {latencyMs !== null && <span className="badge badge-active">{latencyMs}ms round-trip</span>}
         </div>
       </div>
 
-      {/* Quick query chips */}
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
-        {[
-          "Corridor C-14 choke point arbitration",
-          "Aisle B-07 obstacle detour SOP",
-          "Low battery autonomous docking",
-          "Zero-motion safety boundary",
-        ].map((chip) => (
+        {QUICK_QUERIES.map((chip) => (
           <button
             key={chip}
             type="button"
@@ -153,7 +97,6 @@ export function RagSearch() {
         ))}
       </div>
 
-      {/* Search Input Bar */}
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -162,48 +105,29 @@ export function RagSearch() {
         style={{ display: "flex", gap: 8, marginBottom: 16 }}
       >
         <div style={{ position: "relative", flex: 1 }}>
-          <Search
-            className="w-4 h-4"
-            style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "var(--text-muted)" }}
-          />
+          <Search className="w-4 h-4" style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "var(--text-muted)" }} />
           <input
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search warehouse safety SOPs, obstacle detour policies, battery rules..."
-            style={{
-              width: "100%",
-              padding: "9px 12px 9px 36px",
-              backgroundColor: "var(--bg-elevated)",
-              border: "1px solid var(--border-tactical)",
-              borderRadius: 6,
-              fontSize: 13,
-              color: "var(--text-primary)",
-            }}
+            style={{ width: "100%", padding: "9px 12px 9px 36px", backgroundColor: "var(--bg-elevated)", border: "1px solid var(--border-tactical)", borderRadius: 6, fontSize: 13, color: "var(--text-primary)" }}
           />
         </div>
-        <button
-          type="submit"
-          disabled={loading}
-          className="btn btn-primary"
-          style={{ whiteSpace: "nowrap" }}
-        >
-          {loading ? "Querying pgvector..." : "Execute Query"}
+        <button type="submit" disabled={loading} className="btn btn-primary" style={{ whiteSpace: "nowrap" }}>
+          {loading ? "Searching…" : "Execute Query"}
         </button>
       </form>
 
-      {/* Results List */}
+      {error && (
+        <div role="alert" style={{ color: "#EF4444", fontSize: 12, fontFamily: "var(--font-mono)", marginBottom: 10 }}>
+          {error}
+        </div>
+      )}
+
       <div style={{ display: "grid", gap: 10 }}>
         {results.map((doc, idx) => (
-          <div
-            key={doc.id || idx}
-            style={{
-              backgroundColor: "var(--bg-elevated)",
-              border: "1px solid var(--border-tactical)",
-              borderRadius: 6,
-              padding: "12px 14px",
-            }}
-          >
+          <div key={doc.id || idx} style={{ backgroundColor: "var(--bg-elevated)", border: "1px solid var(--border-tactical)", borderRadius: 6, padding: "12px 14px" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                 <FileText className="w-3.5 h-3.5 text-blue-600" />
@@ -212,14 +136,16 @@ export function RagSearch() {
                 </span>
               </div>
               <span className="font-mono" style={{ fontSize: 10.5, color: "var(--text-muted)" }}>
-                Match #{idx + 1} &middot; Cosine Similarity {doc.similarity ? doc.similarity.toFixed(3) : "0.935"}
+                Match #{idx + 1}
+                {typeof doc.similarity === "number" ? ` · Cosine Similarity ${doc.similarity.toFixed(3)}` : ""}
               </span>
             </div>
-            <p style={{ fontSize: 12.5, color: "var(--text-secondary)", lineHeight: 1.5, margin: 0 }}>
-              {doc.content}
-            </p>
+            <p style={{ fontSize: 12.5, color: "var(--text-secondary)", lineHeight: 1.5, margin: 0 }}>{doc.content}</p>
           </div>
         ))}
+        {!loading && !error && results.length === 0 && (
+          <div style={{ color: "var(--text-muted)", fontSize: 12 }}>No matching knowledge chunks.</div>
+        )}
       </div>
     </div>
   );

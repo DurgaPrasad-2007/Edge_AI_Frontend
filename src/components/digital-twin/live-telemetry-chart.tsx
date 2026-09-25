@@ -1,117 +1,39 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Activity, Wifi, ShieldCheck, Zap } from "lucide-react";
+import { Activity, Wifi } from "lucide-react";
+import { useFleetSocket } from "@/lib/use-fleet-socket";
 
+/** Peer packets exchanged per control tick, sampled from the coordinator's real message counter. */
 export function LiveTelemetryChart({ isRunning, messages = 0 }: { isRunning: boolean; messages?: number }) {
-  const [latencyHistory, setLatencyHistory] = useState<number[]>([
-    42, 43, 41, 44, 42, 45, 43, 42, 44, 43, 42, 44, 43, 42, 42,
-  ]);
-  const [currentLatency, setCurrentLatency] = useState(42);
+  const { history, world } = useFleetSocket();
+  const samples = history.messageRate.slice(-30);
+  const period = world?.config.control_period_s ?? 0.6;
+  const latest = samples[samples.length - 1] ?? 0;
+  const peak = Math.max(1, ...samples);
+  const perSecond = latest / period;
 
-  // Derive packet rate from ROS 2/Zenoh message increments (3 msgs per 600ms tick = 5 Hz base)
-  const packetRate = isRunning ? 5 : 0;
-
-  useEffect(() => {
-    if (!isRunning || messages === 0) return;
-
-    // Deterministic peer latency based on real packet count
-    const lat = 40 + (messages % 5);
-    setCurrentLatency(lat);
-    setLatencyHistory((prev) => [...prev.slice(1), lat]);
-  }, [isRunning, messages]);
-
-  // Construct SVG Polyline coordinates (Width: 320, Height: 44)
-  const minLat = 30;
-  const maxLat = 80;
   const width = 280;
   const height = 40;
-  const step = width / (latencyHistory.length - 1);
-
-  const points = latencyHistory
-    .map((lat, idx) => {
-      const x = idx * step;
-      const y = height - ((lat - minLat) / (maxLat - minLat)) * height;
-      return `${x.toFixed(1)},${y.toFixed(1)}`;
-    })
-    .join(" ");
+  const step = samples.length > 1 ? width / (samples.length - 1) : width;
+  const points = samples.map((v, i) => `${(i * step).toFixed(1)},${(height - (v / peak) * height).toFixed(1)}`).join(" ");
 
   return (
-    <div
-      className="glass-panel"
-      style={{
-        borderRadius: 8,
-        padding: "12px 16px",
-        marginTop: 12,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        flexWrap: "wrap",
-        gap: 16,
-      }}
-    >
-      {/* Metric 1: Decision Latency + Sparkline */}
-      <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-        <div>
-          <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "var(--text-muted)", textTransform: "uppercase", fontWeight: 700 }}>
-            <Activity className="w-3.5 h-3.5 text-blue-600 animate-live-dot" />
-            <span>P2P Consensus Latency</span>
-          </div>
-          <div style={{ display: "flex", alignItems: "baseline", gap: 6, marginTop: 2 }}>
-            <span className="mono-metric" style={{ fontSize: 20, fontWeight: 800, color: "var(--status-active)" }}>
-              {currentLatency}
-            </span>
-            <span style={{ fontSize: 11, fontWeight: 600, color: "var(--text-muted)" }}>ms (P95)</span>
-          </div>
-        </div>
-
-        {/* Real-time Animated Sparkline */}
-        <div style={{ width: 140, height: 32, display: "flex", alignItems: "center" }}>
-          <svg viewBox={`0 0 ${width} ${height}`} style={{ width: "100%", height: "100%", overflow: "visible" }}>
-            <polyline
-              points={points}
-              fill="none"
-              stroke="var(--status-active)"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              style={{ transition: "all 0.4s ease" }}
-            />
-            {/* Animated current point */}
-            {latencyHistory.length > 0 && (
-              <circle
-                cx={width}
-                cy={height - ((currentLatency - minLat) / (maxLat - minLat)) * height}
-                r="3.5"
-                fill="var(--status-active)"
-              />
-            )}
-          </svg>
-        </div>
-      </div>
-
-      {/* Metric 2: Peer Mesh Packet Frequency */}
+    <div className="glass-panel" style={{ borderRadius: 8, padding: "12px 16px", marginTop: 12, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-        <Wifi className="w-4 h-4" style={{ color: "var(--solar-terracotta)" }} />
+        <Activity className="w-4 h-4" style={{ color: "var(--solar-terracotta)" }} />
         <div>
-          <div style={{ fontSize: 11, color: "var(--text-muted)", textTransform: "uppercase", fontWeight: 700 }}>
-            ROS 2 / Zenoh Rate
-          </div>
-          <div style={{ display: "flex", alignItems: "baseline", gap: 4, marginTop: 2 }}>
-            <span className="mono-metric" style={{ fontSize: 16, fontWeight: 800, color: "var(--text-primary)" }}>
-              {packetRate}
-            </span>
-            <span style={{ fontSize: 11, color: "var(--text-muted)" }}>Hz (Broadcast)</span>
+          <div style={{ fontSize: 12, fontWeight: 700, color: "var(--text-primary)" }}>Peer Packet Rate</div>
+          <div className="font-mono" style={{ fontSize: 11, color: "var(--text-muted)" }}>
+            {isRunning ? `${latest} / tick · ${perSecond.toFixed(1)} / s` : "paused"} &middot; {messages} total
           </div>
         </div>
       </div>
-
-      {/* Metric 3: Zero-Motion Safety Boundary */}
-      <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12 }}>
-        <ShieldCheck className="w-4 h-4" style={{ color: "var(--solar-terracotta)" }} />
-        <span style={{ fontWeight: 600, color: "var(--text-secondary)" }}>
-          SIL-2 Non-Motion Observer Active
-        </span>
+      <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Peer packets per tick">
+        {samples.length > 1 && <polyline points={points} fill="none" stroke="var(--solar-terracotta)" strokeWidth="2" strokeLinejoin="round" />}
+      </svg>
+      <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "var(--text-muted)" }}>
+        <Wifi className="w-3.5 h-3.5" />
+        <span>peak {peak} / tick</span>
       </div>
     </div>
   );

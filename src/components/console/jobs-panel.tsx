@@ -13,7 +13,20 @@
  */
 
 import { useState, type FormEvent } from "react";
-import { useAuth } from "@/components/auth-provider";
+import {
+  Package,
+  ShoppingCart,
+  Truck,
+  Warehouse,
+  CheckCircle2,
+  Pencil,
+  Trash2,
+  Plus,
+  AlertTriangle,
+  ArrowRight,
+  X,
+  Cpu,
+} from "lucide-react";
 import {
   useFleetSocket,
   type TaskRecord,
@@ -22,7 +35,7 @@ import {
   type UrgencyLevel,
   type RobotId,
 } from "@/lib/use-fleet-socket";
-import { WAREHOUSE_NODES } from "@/lib/warehouse-graph";
+import { FleetStatusBanner } from "@/components/fleet-status-banner";
 
 const STATUS_COLORS: Record<string, string> = {
   Queued: "#64748B",
@@ -32,17 +45,14 @@ const STATUS_COLORS: Record<string, string> = {
   Blocked: "#EF4444",
 };
 
-const AMR_COLORS: Record<string, string> = {
-  "AMR-01": "#C2541A",
-  "AMR-02": "#F59E0B",
-  "AMR-03": "#38BDF8",
-};
-
-const PAYLOAD_SIZE_METRICS: Record<PayloadSize, { label: string; defaultWeight: number; icon: string; maxWeight: number }> = {
-  small: { label: "Small Tote / Bin", defaultWeight: 35, icon: "📦", maxWeight: 80 },
-  medium: { label: "Medium Cart / Crate", defaultWeight: 180, icon: "🛒", maxWeight: 350 },
-  heavy: { label: "Heavy Industrial Pallet", defaultWeight: 650, icon: "🏗️", maxWeight: 1000 },
-  pallet: { label: "High-Bay Bulk Pallet", defaultWeight: 1100, icon: "🏢", maxWeight: 1500 },
+const PAYLOAD_SIZE_METRICS: Record<
+  PayloadSize,
+  { label: string; defaultWeight: number; icon: React.ReactNode; maxWeight: number }
+> = {
+  small: { label: "Small Tote / Bin", defaultWeight: 35, icon: <Package className="w-3.5 h-3.5" />, maxWeight: 80 },
+  medium: { label: "Medium Cart / Crate", defaultWeight: 180, icon: <ShoppingCart className="w-3.5 h-3.5" />, maxWeight: 350 },
+  heavy: { label: "Heavy Industrial Pallet", defaultWeight: 650, icon: <Truck className="w-3.5 h-3.5" />, maxWeight: 1000 },
+  pallet: { label: "High-Bay Bulk Pallet", defaultWeight: 1100, icon: <Warehouse className="w-3.5 h-3.5" />, maxWeight: 1500 },
 };
 
 function TaskCard({
@@ -58,39 +68,54 @@ function TaskCard({
   onDelete: (id: string) => void;
   canEdit: boolean;
 }) {
+  const { robotColor } = useFleetSocket();
   const statusColor = STATUS_COLORS[task.status] ?? "#64748B";
-  const amrColor = task.assigned_robot_id ? AMR_COLORS[task.assigned_robot_id] : "#64748B";
+  const amrColor = robotColor(task.assigned_robot_id);
   const sizeInfo = PAYLOAD_SIZE_METRICS[task.payload_size ?? "medium"];
 
   return (
-    <div className="task-card" style={{ position: "relative", borderLeft: `4px solid ${statusColor}` }}>
+    <div className="task-card">
       <div className="task-card-header">
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <span className="task-id">{task.id}</span>
-          <span style={{ fontSize: 13 }} title={`Payload Size: ${sizeInfo.label}`}>
-            {sizeInfo.icon}
-          </span>
           <span
             style={{
-              fontSize: 10,
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 5,
+              fontSize: 11,
               fontFamily: "var(--font-mono)",
-              padding: "2px 6px",
+              padding: "2px 8px",
               borderRadius: 4,
-              backgroundColor: "rgba(255,255,255,0.06)",
+              backgroundColor: "var(--bg-elevated)",
+              border: "1px solid var(--border-subtle)",
               color: "var(--text-secondary)",
             }}
+            title={`Payload Size: ${sizeInfo.label}`}
           >
-            {task.payload_kg ?? sizeInfo.defaultWeight} kg
+            {sizeInfo.icon}
+            <span>{task.payload_kg ?? sizeInfo.defaultWeight} kg</span>
           </span>
           {task.urgency === "critical" && (
-            <span style={{ fontSize: 9, fontWeight: 800, color: "#EF4444", backgroundColor: "rgba(239, 68, 68, 0.15)", padding: "2px 5px", borderRadius: 4 }}>
+            <span
+              style={{
+                fontSize: 9.5,
+                fontWeight: 800,
+                color: "#EF4444",
+                backgroundColor: "rgba(239, 68, 68, 0.12)",
+                border: "1px solid rgba(239, 68, 68, 0.3)",
+                padding: "2px 6px",
+                borderRadius: 4,
+                letterSpacing: "0.04em",
+              }}
+            >
               CRITICAL
             </span>
           )}
         </div>
         <span
           className="task-status-badge"
-          style={{ color: statusColor, borderColor: `${statusColor}40`, background: `${statusColor}12` }}
+          style={{ color: statusColor, borderColor: `${statusColor}40`, background: `${statusColor}14` }}
         >
           {task.status}
         </span>
@@ -98,27 +123,30 @@ function TaskCard({
 
       <div className="task-route">
         <div className="task-location">
-          <span className="task-loc-label">FROM (PICKUP)</span>
+          <span className="task-loc-label">FROM</span>
           <span className="task-loc-val">{task.pickup}</span>
         </div>
-        <div className="task-arrow">➔</div>
+        <ArrowRight className="w-4 h-4 text-muted" style={{ margin: "0 4px", opacity: 0.5 }} />
         <div className="task-location">
-          <span className="task-loc-label">TO (DROPOFF)</span>
+          <span className="task-loc-label">TO</span>
           <span className="task-loc-val">{task.destination}</span>
         </div>
       </div>
 
-      <div className="task-footer" style={{ marginTop: 12 }}>
+      <div className="task-footer">
         <div className="task-meta">
           <span className="task-priority-label">PRIORITY</span>
-          <div className="task-priority-bar" style={{ width: 60 }}>
-            <div style={{ width: `${task.priority}%`, background: `hsl(${task.priority * 1.2}, 80%, 55%)` }} />
+          <div className="task-priority-bar">
+            <div style={{ width: `${task.priority}%`, background: "var(--solar-terracotta)" }} />
           </div>
           <span className="task-priority-val">{task.priority}</span>
         </div>
 
         {task.assigned_robot_id && (
-          <div className="task-assignment" style={{ color: amrColor, borderColor: `${amrColor}40` }}>
+          <div
+            className="task-assignment"
+            style={{ color: amrColor, borderColor: `${amrColor}40`, backgroundColor: `${amrColor}14` }}
+          >
             {task.assigned_robot_id}
           </div>
         )}
@@ -127,61 +155,64 @@ function TaskCard({
           <div style={{ display: "flex", gap: 6, marginLeft: "auto" }}>
             <button
               className="btn btn-secondary"
-              style={{ fontSize: 10, padding: "3px 8px" }}
+              style={{ fontSize: 11, padding: "4px 9px", display: "inline-flex", alignItems: "center", gap: 4 }}
               onClick={() => onEdit(task)}
               title="Edit Task Attributes & Payload Size"
             >
-              ✎ Edit
+              <Pencil className="w-3 h-3" />
+              <span>Edit</span>
             </button>
             {task.status !== "Completed" && (
               <button
                 className="task-complete-btn"
-                style={{ fontSize: 10, padding: "3px 8px" }}
+                style={{ fontSize: 11, padding: "4px 9px", display: "inline-flex", alignItems: "center", gap: 4 }}
                 onClick={() => onComplete(task.id)}
               >
-                ✓ Complete
+                <CheckCircle2 className="w-3 h-3" />
+                <span>Complete</span>
               </button>
             )}
             <button
               className="btn btn-danger"
-              style={{ fontSize: 10, padding: "3px 8px" }}
+              style={{ fontSize: 11, padding: "4px 8px", display: "inline-flex", alignItems: "center" }}
               onClick={() => onDelete(task.id)}
               title="Delete or cancel task"
             >
-              ✕
+              <Trash2 className="w-3 h-3" />
             </button>
           </div>
         )}
       </div>
 
-      <div className="task-created">
-        Created: {new Date(task.created_at).toLocaleTimeString("en-US", { hour12: false })} · Size Class: {task.payload_size?.toUpperCase() ?? "MEDIUM"}
+      <div className="task-created" style={{ marginTop: 8, fontSize: 10, color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>
+        Created: {new Date(task.created_at).toLocaleTimeString("en-US", { hour12: false })} &middot; Size Class: {task.payload_size?.toUpperCase() ?? "MEDIUM"}
       </div>
     </div>
   );
 }
 
 export function JobsPanel() {
-  const { session, user } = useAuth();
   const {
     tasks,
     events,
     p2pMessages,
     robots,
+    world,
+    robotColor,
     createTask,
     updateTask,
     deleteTask,
     completeTask,
     injectBlockage,
-  } = useFleetSocket(session?.access_token);
+  } = useFleetSocket();
 
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingTask, setEditingTask] = useState<TaskRecord | null>(null);
-  const [filter, setFilter] = useState<"all" | "Queued" | "Assigned" | "In Progress" | "Completed">("all");
+  const [filter, setFilter] = useState<"all" | "Queued" | "Assigned" | "In Progress" | "Completed" | "Blocked">("all");
 
   // Form State for Creation
-  const [pickup, setPickup] = useState("RACK A-02");
-  const [dest, setDest] = useState("DOCK-E");
+  const [pickupChoice, setPickup] = useState("");
+  const [destChoice, setDest] = useState("");
   const [priority, setPriority] = useState(75);
   const [payloadSize, setPayloadSize] = useState<PayloadSize>("medium");
   const [payloadKg, setPayloadKg] = useState(180);
@@ -200,14 +231,16 @@ export function JobsPanel() {
   const auctionEvents = events.filter((e) => e.type === "HANDOFF" || e.type === "REROUTE" || e.type === "INTENT");
   const filtered = filter === "all" ? tasks : tasks.filter((t) => t.status === filter);
 
-  const availableLocations = Object.keys(WAREHOUSE_NODES).filter((k) =>
-    k.startsWith("RACK") || k.startsWith("DOCK") || k === "CHARGE"
-  );
+  // Locations are whatever the backend's warehouse graph offers as stops.
+  const availableLocations = (world?.nodes ?? []).filter((n) => n.type === "rack" || n.type === "dock" || n.type === "charge").map((n) => n.id);
+  const pickup = pickupChoice || availableLocations[0] || "";
+  const dest = destChoice || availableLocations.find((id) => id !== pickup) || "";
+  const aisleId = world?.nodes.find((n) => /aisle/i.test(n.id))?.id ?? "B-07";
 
   async function handleCreateSubmit(e: FormEvent) {
     e.preventDefault();
     setSubmitting(true);
-    await createTask({
+    const created = await createTask({
       pickup,
       destination: dest,
       priority,
@@ -216,7 +249,7 @@ export function JobsPanel() {
       urgency,
     });
     setSubmitting(false);
-    setShowCreateModal(false);
+    if (created) setShowCreateModal(false); // on failure the banner shows the backend's reason
   }
 
   function openEditModal(task: TaskRecord) {
@@ -232,19 +265,21 @@ export function JobsPanel() {
     e.preventDefault();
     if (!editingTask) return;
     setSubmitting(true);
-    await updateTask(editingTask.id, {
+    const reassign = editAssignedRobot !== "auto" && editAssignedRobot !== editingTask.assigned_robot_id;
+    const updated = await updateTask(editingTask.id, {
       priority: editPriority,
       payload_size: editPayloadSize,
       payload_kg: editPayloadKg,
       urgency: editUrgency,
-      assigned_robot_id: editAssignedRobot === "auto" ? null : editAssignedRobot,
+      ...(reassign ? { assigned_robot_id: editAssignedRobot as RobotId } : {}),
     });
     setSubmitting(false);
-    setEditingTask(null);
+    if (updated) setEditingTask(null);
   }
 
   return (
     <div className="console-panel jobs-panel">
+      <FleetStatusBanner />
       <div className="panel-header">
         <div className="panel-title-group">
           <h1 className="panel-title">Task & Payload Operations</h1>
@@ -255,17 +290,20 @@ export function JobsPanel() {
         <div className="panel-header-actions" style={{ display: "flex", gap: 10 }}>
           <button
             className="btn btn-primary"
-            style={{ fontWeight: 700 }}
+            style={{ fontWeight: 700, display: "inline-flex", alignItems: "center", gap: 6 }}
             onClick={() => setShowCreateModal(true)}
           >
-            + Create Warehouse Task
+            <Plus className="w-4 h-4" />
+            <span>Create Mission</span>
           </button>
           <button
             className="btn btn-secondary"
-            onClick={() => injectBlockage("B-07")}
-            title="Inject B-07 obstacle to test real-time D* detour"
+            style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
+            onClick={() => injectBlockage(aisleId)}
+            title="Toggle an aisle obstacle to test real-time A* re-routing"
           >
-            ⚠ Test Detour Obstacle
+            <AlertTriangle className="w-3.5 h-3.5" />
+            <span>Test Detour</span>
           </button>
         </div>
       </div>
@@ -297,7 +335,7 @@ export function JobsPanel() {
                 {r.id} · {r.name}
               </div>
               <div style={{ fontSize: 10, color: "var(--text-muted)" }}>
-                Max Payload: {r.payload_capacity_kg ?? (r.id === "AMR-01" ? 1200 : r.id === "AMR-02" ? 350 : 700)} kg
+                Max Payload: {r.payload_capacity_kg ?? "—"} kg &middot; carrying {r.current_payload_kg ?? 0} kg
               </div>
             </div>
             <div style={{ textAlign: "right", fontFamily: "var(--font-mono)", fontSize: 11 }}>
@@ -312,7 +350,7 @@ export function JobsPanel() {
 
       {/* Filter Tabs */}
       <div className="filter-tabs">
-        {(["all", "Queued", "Assigned", "In Progress", "Completed"] as const).map((f) => (
+        {(["all", "Queued", "Assigned", "In Progress", "Completed", "Blocked"] as const).map((f) => (
           <button
             key={f}
             className={`filter-tab${filter === f ? " filter-tab-active" : ""}`}
@@ -328,10 +366,12 @@ export function JobsPanel() {
         <div className="jobs-task-list">
           {filtered.length === 0 ? (
             <div className="empty-state">
-              <div className="empty-icon">📦</div>
+              <div className="empty-icon">
+                <Package className="w-8 h-8" style={{ color: "var(--text-tertiary)" }} />
+              </div>
               <div className="empty-title">No tasks {filter !== "all" ? `with status "${filter}"` : "posted yet"}</div>
               <div className="empty-sub">
-                Click "+ Create Warehouse Task" to configure payload size, weight, and priority. The Contract-Net protocol will automatically calculate peer utility and award the contract to the best AMR!
+                Click "Create Mission" to configure payload size, weight, and priority. The Contract-Net protocol will automatically calculate peer utility and award the contract to the best AMR!
               </div>
             </div>
           ) : (
@@ -351,7 +391,10 @@ export function JobsPanel() {
         {/* Live Contract Net Auction & P2P Stream */}
         <div className="auction-feed-panel">
           <div className="auction-feed-title">
-            <span>⚡ Contract-Net Auction & Peer Bids</span>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+              <Cpu className="w-3.5 h-3.5" style={{ color: "var(--solar-terracotta)" }} />
+              <span>Contract-Net Auction & Peer Bids</span>
+            </span>
             <span className="auction-feed-count">{p2pMessages.length} P2P packets</span>
           </div>
 
@@ -372,7 +415,7 @@ export function JobsPanel() {
                   }}
                 >
                   <div style={{ display: "flex", justifyContent: "space-between", color: "var(--text-muted)", marginBottom: 2 }}>
-                    <span style={{ fontWeight: 800, color: AMR_COLORS[pkt.sender] ?? "#10B981" }}>
+                    <span style={{ fontWeight: 800, color: robotColor(pkt.sender) }}>
                       {pkt.sender} ➔ {pkt.recipient}
                     </span>
                     <span>{pkt.timestamp}</span>
@@ -406,7 +449,7 @@ export function JobsPanel() {
             </div>
             <div className="auction-proto-row">
               <span>Dynamic Reroute</span>
-              <span>A* and D* Lite recompute traversal upon aisle blockage</span>
+              <span>A* replans every affected route upon a blockage</span>
             </div>
           </div>
         </div>
@@ -418,7 +461,9 @@ export function JobsPanel() {
           <div className="modal-box" style={{ maxWidth: 540 }} onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <span style={{ fontWeight: 800 }}>Create New Warehouse Mission</span>
-              <button className="modal-close" onClick={() => setShowCreateModal(false)}>✕</button>
+              <button className="modal-close" onClick={() => setShowCreateModal(false)}>
+                <X className="w-4 h-4" />
+              </button>
             </div>
             <form className="modal-form" onSubmit={handleCreateSubmit}>
               {/* Pickup & Destination */}
@@ -429,6 +474,7 @@ export function JobsPanel() {
                     className="form-input"
                     value={pickup}
                     onChange={(e) => setPickup(e.target.value)}
+                    required
                   >
                     {availableLocations.map((loc) => (
                       <option key={`p-${loc}`} value={loc}>
@@ -469,18 +515,20 @@ export function JobsPanel() {
                           setPayloadKg(item.defaultWeight);
                         }}
                         style={{
-                          padding: "8px 6px",
+                          padding: "10px 6px",
                           borderRadius: 6,
-                          border: isSel ? "2px solid var(--accent-amber)" : "1px solid var(--border-tactical)",
-                          backgroundColor: isSel ? "rgba(194,84,26,0.15)" : "var(--bg-surface)",
+                          border: isSel ? "1.5px solid var(--solar-terracotta)" : "1px solid var(--border-subtle)",
+                          backgroundColor: isSel ? "var(--status-active-tint)" : "var(--bg-surface)",
                           color: "var(--text-primary)",
                           textAlign: "center",
                           cursor: "pointer",
                         }}
                       >
-                        <div style={{ fontSize: 18 }}>{item.icon}</div>
+                        <div style={{ display: "flex", justifyContent: "center", marginBottom: 6, color: isSel ? "var(--solar-terracotta)" : "var(--text-secondary)" }}>
+                          {item.icon}
+                        </div>
                         <div style={{ fontSize: 10, fontWeight: 700 }}>{sz.toUpperCase()}</div>
-                        <div style={{ fontSize: 9, color: "var(--text-muted)" }}>~{item.defaultWeight}kg</div>
+                        <div style={{ fontSize: 9, color: "var(--text-muted)", marginTop: 2 }}>~{item.defaultWeight}kg</div>
                       </button>
                     );
                   })}
@@ -490,7 +538,7 @@ export function JobsPanel() {
               {/* Payload Weight Slider */}
               <div className="form-group">
                 <label>
-                  Payload Weight: <strong style={{ color: "#06B6D4" }}>{payloadKg} kg</strong> (Max: {PAYLOAD_SIZE_METRICS[payloadSize].maxWeight} kg)
+                  Payload Weight: <strong style={{ color: "var(--solar-terracotta)" }}>{payloadKg} kg</strong> (Max: {PAYLOAD_SIZE_METRICS[payloadSize].maxWeight} kg)
                 </label>
                 <input
                   className="form-range"
@@ -518,7 +566,7 @@ export function JobsPanel() {
                   </select>
                 </div>
                 <div className="form-group">
-                  <label>Priority: <strong style={{ color: "#06B6D4" }}>{priority}</strong></label>
+                  <label>Priority: <strong style={{ color: "var(--solar-terracotta)" }}>{priority}</strong></label>
                   <input
                     className="form-range"
                     type="range"
@@ -549,7 +597,9 @@ export function JobsPanel() {
           <div className="modal-box" style={{ maxWidth: 520 }} onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <span style={{ fontWeight: 800 }}>Manage Task Attributes: {editingTask.id}</span>
-              <button className="modal-close" onClick={() => setEditingTask(null)}>✕</button>
+              <button className="modal-close" onClick={() => setEditingTask(null)}>
+                <X className="w-4 h-4" />
+              </button>
             </div>
             <form className="modal-form" onSubmit={handleEditSubmit}>
               <div className="form-group">
@@ -575,16 +625,18 @@ export function JobsPanel() {
                           setEditPayloadKg(item.defaultWeight);
                         }}
                         style={{
-                          padding: "8px 6px",
+                          padding: "10px 6px",
                           borderRadius: 6,
-                          border: isSel ? "2px solid var(--accent-amber)" : "1px solid var(--border-tactical)",
-                          backgroundColor: isSel ? "rgba(194,84,26,0.15)" : "var(--bg-surface)",
+                          border: isSel ? "1.5px solid var(--solar-terracotta)" : "1px solid var(--border-subtle)",
+                          backgroundColor: isSel ? "var(--status-active-tint)" : "var(--bg-surface)",
                           color: "var(--text-primary)",
                           textAlign: "center",
                           cursor: "pointer",
                         }}
                       >
-                        <div style={{ fontSize: 18 }}>{item.icon}</div>
+                        <div style={{ display: "flex", justifyContent: "center", marginBottom: 6, color: isSel ? "var(--solar-terracotta)" : "var(--text-secondary)" }}>
+                          {item.icon}
+                        </div>
                         <div style={{ fontSize: 10, fontWeight: 700 }}>{sz.toUpperCase()}</div>
                       </button>
                     );
@@ -642,9 +694,11 @@ export function JobsPanel() {
                   onChange={(e) => setEditAssignedRobot(e.target.value as RobotId | "auto")}
                 >
                   <option value="auto">Auto (Contract-Net Protocol Auction)</option>
-                  <option value="AMR-01">AMR-01 (Atlas · 1200kg Max)</option>
-                  <option value="AMR-02">AMR-02 (Nova · 350kg Max)</option>
-                  <option value="AMR-03">AMR-03 (Kite · 700kg Max)</option>
+                  {robots.map((r) => (
+                    <option key={r.id} value={r.id}>
+                      {r.id} ({r.name} · {r.payload_capacity_kg ?? "?"}kg Max)
+                    </option>
+                  ))}
                 </select>
               </div>
 

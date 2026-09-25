@@ -14,6 +14,10 @@ interface SimulatorControlsProps {
   onToggleRadar?: () => void;
   showHeatmap?: boolean;
   onToggleHeatmap?: () => void;
+  /** e.g. "Aisle B-07" — the obstacle the inject button toggles */
+  aisleLabel?: string;
+  /** true while the backend is unreachable: commands cannot be sent */
+  disabled?: boolean;
 }
 
 export function SimulatorControls({
@@ -27,6 +31,8 @@ export function SimulatorControls({
   onToggleRadar,
   showHeatmap = false,
   onToggleHeatmap,
+  aisleLabel = "Aisle",
+  disabled = false,
 }: SimulatorControlsProps) {
   return (
     <div className="simulator-toolbar" role="toolbar" aria-label="Floor Simulation Controls">
@@ -74,10 +80,10 @@ export function SimulatorControls({
             onClick={onToggleHeatmap}
             className={`btn ${showHeatmap ? "btn-active-toggle" : "btn-secondary"}`}
             style={{ padding: "5px 10px", fontSize: 11 }}
-            title="Toggle Traffic Congestion Heatmap"
+            title="Highlight where AMRs are currently waiting"
           >
             <Flame className="w-3.5 h-3.5" />
-            <span>Traffic Density</span>
+            <span>Congestion</span>
           </button>
         )}
 
@@ -87,7 +93,8 @@ export function SimulatorControls({
           onClick={onReset}
           className="btn btn-secondary"
           style={{ padding: "6px 12px", fontSize: 12 }}
-          title="Reset floor paths and robot positions"
+          title="Return robots to their docks and requeue in-flight tasks"
+          disabled={disabled}
         >
           <RotateCcw className="w-3.5 h-3.5" />
           Reset Floor
@@ -99,10 +106,11 @@ export function SimulatorControls({
           onClick={onInjectBlockage}
           className={`btn ${aisleBlocked ? "btn-secondary" : "btn-danger"}`}
           style={{ padding: "6px 12px", fontSize: 12 }}
-          title="Inject obstacle in Corridor B-07 to force dynamic detour"
+          title={`Block ${aisleLabel} to force a real A* replan`}
+          disabled={disabled}
         >
           <AlertTriangle className="w-3.5 h-3.5" />
-          {aisleBlocked ? "Clear B-07 Block" : "Inject B-07 Obstacle"}
+          {aisleBlocked ? "Clear Obstacle" : `Block ${aisleLabel}`}
         </button>
 
         {/* Run / Pause */}
@@ -111,14 +119,15 @@ export function SimulatorControls({
           onClick={onToggleRunning}
           className={`btn ${isRunning ? "btn-secondary" : "btn-primary"}`}
           style={{ padding: "6px 14px", fontSize: 12 }}
+          disabled={disabled}
         >
           {isRunning ? (
             <>
-              <Pause className="w-3.5 h-3.5" /> Pause Mesh
+              <Pause className="w-3.5 h-3.5" /> Pause Fleet
             </>
           ) : (
             <>
-              <Play className="w-3.5 h-3.5" /> Run Live Mesh
+              <Play className="w-3.5 h-3.5" /> Run Fleet
             </>
           )}
         </button>

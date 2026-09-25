@@ -136,8 +136,8 @@ export function CommandPalette({
     {
       id: "sim-obstacle",
       category: "Simulation",
-      title: "Inject / Clear Aisle B-07 Obstacle",
-      description: "Trigger real-time D* Lite dynamic rerouting on AMR-03",
+      title: "Toggle Aisle Obstacle",
+      description: "Robots whose routes cross the blocked aisle replan with A*",
       icon: <Sliders className="w-4 h-4 text-amber-500" />,
       shortcut: "B",
       perform: () => {

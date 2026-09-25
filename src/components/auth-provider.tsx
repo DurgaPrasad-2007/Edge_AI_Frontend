@@ -85,16 +85,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const trimmedEmail = email.trim().toLowerCase();
     const trimmedPassword = password.trim();
 
-    // Check if this matches a known demo profile for fallback
-    const isDemoAdmin =
-      trimmedEmail === DEFAULT_ADMIN_CREDENTIALS.email.toLowerCase() &&
-      (trimmedPassword === DEFAULT_ADMIN_CREDENTIALS.password || trimmedPassword === "admin" || trimmedPassword === "demo");
-
-    const isDemoOperator =
-      trimmedEmail === "operator@edgefleet.local" &&
-      (trimmedPassword === "operator-demo-2026" || trimmedPassword === "operator" || trimmedPassword === "demo");
-
-    // 1. Authenticate with real Python FastAPI backend via OAuth2 Form
+    // Authenticate with the FastAPI backend (OAuth2 password form). There is no offline/demo fallback.
     try {
       const body = new URLSearchParams({ username: trimmedEmail, password: trimmedPassword });
       const response = await fetch(`${apiBase}/api/auth/token`, {
@@ -114,7 +105,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (profileResponse.ok) {
           const userData = (await profileResponse.json()) as User;
           window.sessionStorage.setItem("edgefleet_access_token", token);
-          window.sessionStorage.removeItem("edgefleet_mock_user");
           setSession({ access_token: token });
           setUser(userData);
           return;
@@ -134,7 +124,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signOut = () => {
     if (typeof window !== "undefined") {
       window.sessionStorage.removeItem("edgefleet_access_token");
-      window.sessionStorage.removeItem("edgefleet_mock_user");
     }
     setSession(null);
     setUser(null);

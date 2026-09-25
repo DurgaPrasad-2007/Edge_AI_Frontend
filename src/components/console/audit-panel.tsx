@@ -1,21 +1,28 @@
 "use client";
 
 /**
- * AuditPanel — Searchable audit trail for all console actions
+ * AuditPanel — reads the persisted audit trail (GET /api/audit).
+ * Every row was written by the backend with the authenticated actor; nothing is built client-side.
  */
 
-import { useState, useEffect, useRef } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { useAuth } from "@/components/auth-provider";
 import { useFleetSocket } from "@/lib/use-fleet-socket";
+import { KeyRound, Zap, Package, Settings, Terminal } from "lucide-react";
 
-type AuditEntry = {
-  id: string;
-  ts: string;
-  type: "AUTH" | "CONTROL" | "TASK" | "CONFIG" | "SYSTEM";
+type AuditCategory = "AUTH" | "CONTROL" | "TASK" | "CONFIG" | "SYSTEM";
+
+interface AuditEntry {
+  id: number;
+  created_at: string;
   actor: string;
-  action: string;
-  detail: string;
-};
+  category: AuditCategory;
+  event_type: string | null;
+  sim_time: string | null;
+  message: string;
+}
+
+const apiBase = process.env.NEXT_PUBLIC_EDGE_API_BASE_URL ?? "http://localhost:8000";
 
 const TYPE_COLORS: Record<string, string> = {
   AUTH: "#06B6D4",
@@ -25,70 +32,66 @@ const TYPE_COLORS: Record<string, string> = {
   SYSTEM: "#64748B",
 };
 
-const TYPE_ICONS: Record<string, string> = {
-  AUTH: "🔐",
-  CONTROL: "⚡",
-  TASK: "📦",
-  CONFIG: "⚙",
-  SYSTEM: "💻",
+const TYPE_ICONS: Record<string, ReactNode> = {
+  AUTH: <KeyRound className="w-3 h-3" />,
+  CONTROL: <Zap className="w-3 h-3" />,
+  TASK: <Package className="w-3 h-3" />,
+  CONFIG: <Settings className="w-3 h-3" />,
+  SYSTEM: <Terminal className="w-3 h-3" />,
 };
 
 function AuditRow({ entry }: { entry: AuditEntry }) {
-  const color = TYPE_COLORS[entry.type] ?? "#64748B";
+  const color = TYPE_COLORS[entry.category] ?? "#64748B";
   return (
     <tr className="audit-row">
-      <td className="audit-ts">{entry.ts}</td>
+      <td className="audit-ts">{new Date(entry.created_at).toLocaleTimeString("en-US", { hour12: false })}</td>
       <td>
-        <span className="audit-type-badge" style={{ color, borderColor: `${color}40`, background: `${color}10` }}>
-          {TYPE_ICONS[entry.type]} {entry.type}
+        <span className="audit-type-badge inline-flex items-center gap-1.5" style={{ color, borderColor: `${color}40`, background: `${color}10` }}>
+          {TYPE_ICONS[entry.category]}
+          <span>{entry.category}</span>
         </span>
       </td>
       <td className="audit-actor">{entry.actor}</td>
-      <td className="audit-action">{entry.action}</td>
-      <td className="audit-detail">{entry.detail}</td>
+      <td className="audit-action">{entry.event_type ?? entry.category}</td>
+      <td className="audit-detail">{entry.message}</td>
     </tr>
   );
 }
 
 export function AuditPanel() {
-  const { user, session } = useAuth();
-  const { events, isConnected } = useFleetSocket(session?.access_token);
+  const { session } = useAuth();
+  const { events } = useFleetSocket();
+  const token = session?.access_token ?? null;
   const [log, setLog] = useState<AuditEntry[]>([]);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
-  const [typeFilter, setTypeFilter] = useState<"ALL" | AuditEntry["type"]>("ALL");
-  const counterRef = useRef(1);
-  const seenMessagesRef = useRef<Set<string>>(new Set());
+  const [typeFilter, setTypeFilter] = useState<"ALL" | AuditCategory>("ALL");
 
-  // Record real WebSocket events into the audit log
+  const load = useCallback(async () => {
+    try {
+      const res = await fetch(`${apiBase}/api/audit?limit=500`, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      setLog((await res.json()) as AuditEntry[]);
+      setLoadError(null);
+    } catch (err) {
+      setLoadError(err instanceof Error ? err.message : "failed to load");
+    }
+  }, [token]);
+
+  // Reload whenever the coordinator emits a new event (and once on mount).
+  const latestEventId = events[0]?.id ?? 0;
   useEffect(() => {
-    if (!events || events.length === 0) return;
-    const newEntries: AuditEntry[] = [];
-    for (const ev of events) {
-      const key = `${ev.time}-${ev.type}-${ev.message}`;
-      if (!seenMessagesRef.current.has(key)) {
-        seenMessagesRef.current.add(key);
-        newEntries.push({
-          id: `A${String(counterRef.current++).padStart(3, "0")}`,
-          ts: ev.time,
-          type: ev.type === "LEASE" || ev.type === "INTENT" ? "CONTROL" : ev.type === "HANDOFF" ? "TASK" : "SYSTEM",
-          actor: "Coordinator",
-          action: ev.type,
-          detail: ev.message,
-        });
-      }
-    }
-    if (newEntries.length > 0) {
-      setLog((prev) => [...newEntries, ...prev].slice(0, 300));
-    }
-  }, [events]);
+    void load();
+  }, [load, latestEventId]);
 
   const filtered = log
-    .filter((e) => typeFilter === "ALL" || e.type === typeFilter)
-    .filter((e) => !search || [e.action, e.actor, e.detail].some((f) => f.toLowerCase().includes(search.toLowerCase())));
+    .filter((e) => typeFilter === "ALL" || e.category === typeFilter)
+    .filter((e) => !search || [e.event_type ?? "", e.actor, e.message].some((f) => f.toLowerCase().includes(search.toLowerCase())));
 
   function exportCSV() {
-    const header = "Timestamp,Type,Actor,Action,Detail\n";
-    const rows = filtered.map((e) => `${e.ts},${e.type},${e.actor},${e.action},"${e.detail}"`).join("\n");
+    const esc = (v: string) => `"${v.replace(/"/g, '""')}"`;
+    const header = "Timestamp,Category,Actor,Type,Detail\n";
+    const rows = filtered.map((e) => [e.created_at, e.category, esc(e.actor), e.event_type ?? "", esc(e.message)].join(",")).join("\n");
     const blob = new Blob([header + rows], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -103,7 +106,7 @@ export function AuditPanel() {
       <div className="panel-header">
         <div className="panel-title-group">
           <h1 className="panel-title">Audit Log</h1>
-          <span className="panel-subtitle">Immutable record of all fleet control actions, auth events, and system state changes</span>
+          <span className="panel-subtitle">Persisted record of fleet control actions, task lifecycle, logins and admin changes — with the acting user</span>
         </div>
         <div className="panel-header-actions">
           <button className="btn-ghost" onClick={exportCSV}>⬇ Export CSV</button>
@@ -111,14 +114,15 @@ export function AuditPanel() {
       </div>
 
       <div className="audit-filter-bar">
-        <input className="comms-search" placeholder="Search actions, actors, details…"
-          value={search} onChange={(e) => setSearch(e.target.value)} />
+        <input className="comms-search" placeholder="Search actions, actors, details…" value={search} onChange={(e) => setSearch(e.target.value)} />
         <div className="audit-type-filters">
           {(["ALL", "AUTH", "CONTROL", "TASK", "CONFIG", "SYSTEM"] as const).map((t) => (
-            <button key={t}
+            <button
+              key={t}
               className={`comms-filter-chip${typeFilter === t ? " active" : ""}`}
               style={typeFilter === t && t !== "ALL" ? { borderColor: TYPE_COLORS[t], color: TYPE_COLORS[t] } : {}}
-              onClick={() => setTypeFilter(t)}>
+              onClick={() => setTypeFilter(t)}
+            >
               {t !== "ALL" && TYPE_ICONS[t]} {t}
             </button>
           ))}
@@ -126,7 +130,7 @@ export function AuditPanel() {
       </div>
 
       <div className="audit-count-bar">
-        Showing {filtered.length} of {log.length} entries
+        Showing {filtered.length} of {log.length} entries {loadError && <span style={{ color: "#EF4444" }}>· could not refresh ({loadError})</span>}
       </div>
 
       <div className="audit-table-container">
@@ -140,9 +144,7 @@ export function AuditPanel() {
             {filtered.length === 0 ? (
               <tr>
                 <td colSpan={5} className="audit-empty" style={{ padding: "32px", textAlign: "center", color: "var(--text-muted)" }}>
-                  {log.length === 0
-                    ? "Awaiting live fleet actions · Events stream in real-time from backend WebSocket..."
-                    : "No matching audit entries found for search filter"}
+                  {log.length === 0 ? "No audit entries recorded yet." : "No matching audit entries found for search filter"}
                 </td>
               </tr>
             ) : (

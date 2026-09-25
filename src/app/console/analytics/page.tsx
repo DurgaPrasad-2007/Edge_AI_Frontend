@@ -1,4 +1,2 @@
-import { redirect } from "next/navigation";
-export default function AnalyticsPage() {
-  redirect("/console/settings");
-}
+import { AnalyticsPanel } from "@/components/console/analytics-panel";
+export default function AnalyticsPage() { return <AnalyticsPanel />; }

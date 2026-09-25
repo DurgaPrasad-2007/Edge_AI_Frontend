@@ -1,32 +1,29 @@
 "use client";
 
 /**
- * useFleetSocket — Real-time WebSocket hook & Algorithmic Task Allocation Client Twin
+ * Fleet state client.
  *
- * Integrates directly with FastAPI Backend (EdgeAI_Backend) endpoints:
- * - WebSocket: /ws/fleet
- * - REST: /api/tasks (GET, POST), /api/tasks/{id} (PATCH), /api/tasks/{id} (DELETE), /api/tasks/{id}/complete
- * - Fleet control: /api/fleet/simulation, /api/fleet/reset, /api/fleet/blockages, /api/fleet/reservations, /api/fleet/intents
+ * The backend (EdgeAI_Backend) is the single source of truth: world graph, robots, tasks, leases,
+ * events, P2P packets and KPIs all arrive over /ws/fleet and are rendered as-is. This module never
+ * simulates anything. When the backend is unreachable the last known state stays visible and the
+ * connection is reported as "offline"; commands fail loudly instead of pretending to succeed.
  *
- * When backend is offline or starting up, uses real algorithmic A* pathfinding
- * on topological warehouse graph and dynamic Contract-Net Protocol (CNP) bidding
- * based on robot capacity, battery, and task payload size/weight!
+ * <FleetProvider> owns the one WebSocket for the whole app; `useFleetSocket()` reads it.
  */
 
-import { useState, useEffect, useRef, useCallback } from "react";
-import {
-  WAREHOUSE_NODES,
-  findShortestPath,
-  findClosestNodeId,
-} from "./warehouse-graph";
+import { createContext, createElement, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useAuth } from "@/components/auth-provider";
 
 const apiBase = process.env.NEXT_PUBLIC_EDGE_API_BASE_URL ?? "http://localhost:8000";
 const wsBase = apiBase.replace(/^http/, "ws");
+// Mirrors the backend's AUTH_REQUIRED: when true there is nothing to stream without a session.
+const authRequired = process.env.NEXT_PUBLIC_AUTH_REQUIRED !== "false";
 
 // ── Types mirroring backend schemas.py ────────────────────────────────────
 
-export type RobotId = "AMR-01" | "AMR-02" | "AMR-03";
+export type RobotId = string;
 export type RobotStatus = "Idle" | "Moving" | "Yielding" | "Rerouting" | "Task handoff" | "Charging" | "Blocked";
+export type RobotLeg = "idle" | "to_pickup" | "to_drop" | "to_home" | "to_charge";
 export type EventType = "LEASE" | "INTENT" | "REROUTE" | "HANDOFF" | "HEARTBEAT";
 export type TaskStatus = "Queued" | "Assigned" | "In Progress" | "Completed" | "Blocked";
 export type PayloadSize = "small" | "medium" | "heavy" | "pallet";
@@ -41,6 +38,9 @@ export interface RobotState {
   battery: number;
   status: RobotStatus;
   task: string;
+  task_id?: string | null;
+  leg?: RobotLeg;
+  target?: string | null;
   priority: number;
   path: Point[];
   path_index: number;
@@ -52,6 +52,7 @@ export interface RobotState {
 }
 
 export interface FleetEvent {
+  id?: number;
   time: string;
   type: EventType;
   message: string;
@@ -66,20 +67,6 @@ export interface P2PMessagePacket {
   timestamp: string;
 }
 
-export interface FleetState {
-  tick: number;
-  running: boolean;
-  aisle_blocked: boolean;
-  reservation: RobotId | null;
-  lease_until: number;
-  completed_tasks: number;
-  collision_count: number;
-  messages: number;
-  events: FleetEvent[];
-  robots: RobotState[];
-  activeP2PMessages?: P2PMessagePacket[];
-}
-
 export interface TaskRecord {
   id: string;
   pickup: string;
@@ -91,6 +78,53 @@ export interface TaskRecord {
   urgency: UrgencyLevel;
   assigned_robot_id: RobotId | null;
   created_at: string;
+}
+
+interface ServerKpis {
+  fleet_utilization_pct: number;
+  avg_battery_pct: number;
+  collision_count: number;
+  active_leases: number;
+  operational_pct: number;
+  completed_total: number;
+  queued_tasks: number;
+  tasks_per_hour: number;
+  tick: number;
+}
+
+export interface FleetState {
+  seq: number;
+  tick: number;
+  running: boolean;
+  aisle_blocked: boolean;
+  blocked_nodes: string[];
+  reservation: RobotId | null;
+  lease_until: number;
+  leases: Record<string, RobotId>;
+  completed_tasks: number;
+  collision_count: number;
+  messages: number;
+  events: FleetEvent[];
+  p2p: P2PMessagePacket[];
+  robots: RobotState[];
+  tasks: TaskRecord[];
+  kpis: ServerKpis;
+}
+
+export interface WorldNode { id: string; x: number; y: number; label: string; type: "rack" | "dock" | "corridor" | "transit" | "charge"; }
+export interface WorldRobot { id: RobotId; name: string; color: string; max_payload_kg: number; speed: number; home: string; }
+export interface WorldConfig {
+  control_period_s: number;
+  low_battery_pct: number;
+  min_bid_battery_pct: number;
+  collision_radius: number;
+}
+export interface World {
+  nodes: WorldNode[];
+  edges: [string, string][];
+  mutex_zones: string[];
+  robots: WorldRobot[];
+  config: WorldConfig;
 }
 
 export interface TaskCreateInput {
@@ -118,14 +152,28 @@ export interface KPIMetrics {
   activeLeases: number;
   meshHealthPct: number;
   completedTotal: number;
+  queuedTasks: number;
   tick: number;
   tasksPerHour: number;
 }
 
-export type ConnectionMode = "live" | "sim";
+/** Rolling window of real samples, one per simulation tick, shared by every screen. */
+export interface FleetHistory {
+  tick: number[];
+  battery: Record<string, number[]>;
+  messageRate: number[];
+  leaseHolder: (string | null)[];
+  lastMessages: number;
+  /** cumulative robot-position density on a 40-unit grid ("x,y" -> samples) since the last reset */
+  heat: Record<string, number>;
+}
+
+export type ConnectionMode = "live" | "offline";
 
 export interface FleetSocketState {
   fleetState: FleetState | null;
+  world: World | null;
+  history: FleetHistory;
   robots: RobotState[];
   events: FleetEvent[];
   p2pMessages: P2PMessagePacket[];
@@ -133,1000 +181,293 @@ export interface FleetSocketState {
   kpis: KPIMetrics;
   connectionMode: ConnectionMode;
   isConnected: boolean;
-  sendControl: (action: "start" | "pause" | "reset" | "step") => Promise<void>;
-  createTask: (input: TaskCreateInput | string, destination?: string, priority?: number) => Promise<TaskRecord | null>;
+  /** true when the backend requires a session and there is none */
+  needsLogin: boolean;
+  error: string | null;
+  clearError: () => void;
+  robotColor: (robotId?: string | null) => string;
+  sendControl: (action: "start" | "pause" | "reset") => Promise<boolean>;
+  createTask: (input: TaskCreateInput) => Promise<TaskRecord | null>;
   updateTask: (taskId: string, input: TaskUpdateInput) => Promise<TaskRecord | null>;
   deleteTask: (taskId: string) => Promise<boolean>;
-  completeTask: (taskId: string) => Promise<void>;
-  injectBlockage: (aisleId?: string) => Promise<void>;
-  requestReservation: (robotId: RobotId, corridorId?: string, leaseSeconds?: number) => Promise<void>;
-  publishIntent: (robotId: RobotId, corridorId?: string, etaSeconds?: number) => Promise<void>;
-  refreshTasks: () => Promise<void>;
+  completeTask: (taskId: string) => Promise<boolean>;
+  setBlockage: (nodeId: string, blocked: boolean) => Promise<boolean>;
+  injectBlockage: (nodeId?: string) => Promise<boolean>;
+  requestReservation: (robotId: RobotId, corridorId?: string, leaseSeconds?: number) => Promise<boolean>;
+  publishIntent: (robotId: RobotId, corridorId?: string, etaSeconds?: number) => Promise<boolean>;
+  setRobotBattery: (robotId: RobotId, battery?: number) => Promise<boolean>;
+  simulateAgentDropout: (robotId: RobotId) => Promise<boolean>;
 }
 
-// ── Robot Capability Specification ────────────────────────────────────────
-
-const ROBOT_CAPACITIES: Record<RobotId, { maxPayloadKg: number; role: string }> = {
-  "AMR-01": { maxPayloadKg: 1200, role: "Heavy Pallet Mover" },
-  "AMR-02": { maxPayloadKg: 350, role: "Agile Bin Picker" },
-  "AMR-03": { maxPayloadKg: 700, role: "Autonomous Tug & Detourer" },
-};
-
-function createInitialState(): FleetState {
-  // Compute initial real A* paths using the warehouse graph
-  const path1 = findShortestPath("DOCK-W", "DOCK-E");
-  const path2 = findShortestPath("INT-N1", "CHARGE");
-  const path3 = findShortestPath("DOCK-E", "BYPASS-W");
-
-  const robots: RobotState[] = [
-    {
-      id: "AMR-01",
-      name: "Atlas",
-      color: "#C2541A",
-      battery: 95,
-      status: "Idle",
-      task: "Standby at Dock W",
-      priority: 50,
-      payload_capacity_kg: 1200,
-      current_payload_kg: 0,
-      path: path1,
-      path_index: 0,
-      progress: 0,
-      position: { ...path1[0] },
-      completed: 0,
-    },
-    {
-      id: "AMR-02",
-      name: "Nova",
-      color: "#F59E0B",
-      battery: 88,
-      status: "Idle",
-      task: "Standby at Bay North",
-      priority: 50,
-      payload_capacity_kg: 350,
-      current_payload_kg: 0,
-      path: path2,
-      path_index: 0,
-      progress: 0,
-      position: { ...path2[0] },
-      completed: 0,
-    },
-    {
-      id: "AMR-03",
-      name: "Kite",
-      color: "#38BDF8",
-      battery: 92,
-      status: "Idle",
-      task: "Standby at Dock E",
-      priority: 50,
-      payload_capacity_kg: 700,
-      current_payload_kg: 0,
-      path: path3,
-      path_index: 0,
-      progress: 0,
-      position: { ...path3[0] },
-      completed: 0,
-    },
-  ];
-
-  return {
-    tick: 0,
-    running: false,
-    aisle_blocked: false,
-    reservation: null,
-    lease_until: 0,
-    completed_tasks: 0,
-    collision_count: 0,
-    messages: 3,
-    events: [
-      { time: "T+00.0s", type: "HEARTBEAT", message: "Zenoh P2P Mesh online | 3 peers connected | Zero-broker DDS active" },
-    ],
-    robots,
-    activeP2PMessages: [
-      {
-        id: "p2p-init-1",
-        sender: "AMR-01",
-        recipient: "MESH",
-        type: "HEARTBEAT",
-        payload: "PEER_DISCOVERY[AMR-01 online, battery=95%, cap=1200kg, node=DOCK-W]",
-        timestamp: new Date().toLocaleTimeString(),
-      },
-    ],
-  };
-}
-
-function computeKPIs(state: FleetState, tasksDoneThisSession: number): KPIMetrics {
-  const robots = state.robots;
-  const activeCount = robots.filter((r) => r.status === "Moving" || r.status === "Task handoff" || r.status === "Rerouting").length;
-  const avgBattery = robots.reduce((s, r) => s + r.battery, 0) / Math.max(1, robots.length);
-  const leases = state.reservation ? 1 : 0;
-  
-  // Dynamic mesh health: 100% when active, scaled by robot connectivity
-  const activeRobotsCount = robots.filter(r => r.battery > 10).length;
-  const meshHealth = Math.round((activeRobotsCount / Math.max(1, robots.length)) * 100);
-
-  // Authentically computed throughput: only compute when tasks were actually completed
-  const totalCompleted = state.completed_tasks + tasksDoneThisSession;
-  const elapsedMinutes = (state.tick * 0.6) / 60;
-  let tasksPerHour = 0;
-  if (totalCompleted > 0 && elapsedMinutes > 0.1) {
-    tasksPerHour = Math.round((totalCompleted / (elapsedMinutes / 60)) * 10) / 10;
-  }
-
-  return {
-    fleetUtilizationPct: Math.round((activeCount / Math.max(1, robots.length)) * 100),
-    avgBatteryPct: Math.round(avgBattery),
-    collisionCount: state.collision_count,
-    activeLeases: leases,
-    meshHealthPct: meshHealth,
-    completedTotal: totalCompleted,
-    tick: state.tick,
-    tasksPerHour: isFinite(tasksPerHour) ? tasksPerHour : 0,
-  };
-}
-
-const DEFAULT_KPI: KPIMetrics = {
+const EMPTY_KPI: KPIMetrics = {
   fleetUtilizationPct: 0,
-  avgBatteryPct: 92,
+  avgBatteryPct: 0,
   collisionCount: 0,
   activeLeases: 0,
-  meshHealthPct: 100,
+  meshHealthPct: 0,
   completedTotal: 0,
+  queuedTasks: 0,
   tick: 0,
   tasksPerHour: 0,
 };
+const HISTORY_WINDOW = 120;
+const EMPTY_HISTORY: FleetHistory = { tick: [], battery: {}, messageRate: [], leaseHolder: [], lastMessages: 0, heat: {} };
 
-// ── Contract Net Protocol Dynamic Bidding ─────────────────────────────────
-
-export function calculateAuctionBid(
-  robot: RobotState,
-  pickupLocation: string,
-  payloadKg: number,
-  taskPriority: number
-): { bidScore: number; isEligible: boolean; disqualificationReason?: string } {
-  const cap = ROBOT_CAPACITIES[robot.id]?.maxPayloadKg ?? 500;
-  if (payloadKg > cap) {
-    return {
-      bidScore: -999,
-      isEligible: false,
-      disqualificationReason: `Exceeds max payload (${payloadKg}kg > ${cap}kg capacity)`,
-    };
+function recordSample(prev: FleetHistory, state: FleetState): FleetHistory {
+  const last = prev.tick[prev.tick.length - 1];
+  if (last !== undefined && state.tick === last) return prev; // command responses repeat the current tick
+  const base = last !== undefined && state.tick > last ? prev : EMPTY_HISTORY; // tick went backwards: floor was reset
+  const battery: Record<string, number[]> = {};
+  for (const r of state.robots) battery[r.id] = [...(base.battery[r.id] ?? []), r.battery].slice(-HISTORY_WINDOW);
+  const delta = base.tick.length === 0 ? 0 : Math.max(0, state.messages - base.lastMessages);
+  const heat = { ...base.heat };
+  for (const r of state.robots) {
+    const cell = `${Math.round(r.position.x / 40) * 40},${Math.round(r.position.y / 40) * 40}`;
+    heat[cell] = (heat[cell] ?? 0) + 1;
   }
-  if (robot.battery < 15) {
-    return {
-      bidScore: -999,
-      isEligible: false,
-      disqualificationReason: "Battery critical (<15%)",
-    };
-  }
-
-  // Calculate distance from robot current pos to pickup node
-  const pickupNode = WAREHOUSE_NODES[pickupLocation] ?? WAREHOUSE_NODES["DOCK-W"];
-  const distanceToPickup = Math.hypot(pickupNode.x - robot.position.x, pickupNode.y - robot.position.y);
-
-  // CNP Utility Function:
-  // (Remaining Capacity Margin * 0.05) + (Battery * 0.4) - (Distance * 0.08) + (Priority * 0.25)
-  const remainingCap = cap - payloadKg;
-  const bidScore = (remainingCap * 0.05) + (robot.battery * 0.4) - (distanceToPickup * 0.08) + (taskPriority * 0.25);
-
-  return { bidScore, isEligible: true };
+  return {
+    tick: [...base.tick, state.tick].slice(-HISTORY_WINDOW),
+    battery,
+    messageRate: [...base.messageRate, delta].slice(-HISTORY_WINDOW),
+    leaseHolder: [...base.leaseHolder, state.reservation].slice(-HISTORY_WINDOW),
+    lastMessages: state.messages,
+    heat,
+  };
 }
 
-// ── Hook ──────────────────────────────────────────────────────────────────
+const EMPTY_ROBOTS: RobotState[] = [];
+const EMPTY_EVENTS: FleetEvent[] = [];
+const EMPTY_P2P: P2PMessagePacket[] = [];
+const EMPTY_TASKS: TaskRecord[] = [];
+const NEUTRAL_COLOR = "#64748B";
 
-export function useFleetSocket(token?: string | null): FleetSocketState {
-  const [fleetState, setFleetState] = useState<FleetState>(createInitialState);
-  const [tasks, setTasks] = useState<TaskRecord[]>([
-    {
-      id: "TSK-101",
-      pickup: "RACK A-02",
-      destination: "DOCK-E",
-      priority: 85,
-      payload_kg: 240,
-      payload_size: "medium",
-      urgency: "standard",
-      status: "In Progress",
-      assigned_robot_id: "AMR-01",
-      created_at: new Date().toISOString(),
-    },
-    {
-      id: "TSK-102",
-      pickup: "RACK B-03",
-      destination: "CHARGE",
-      priority: 92,
-      payload_kg: 75,
-      payload_size: "small",
-      urgency: "critical",
-      status: "In Progress",
-      assigned_robot_id: "AMR-02",
-      created_at: new Date().toISOString(),
-    },
-    {
-      id: "TSK-103",
-      pickup: "RACK C-01",
-      destination: "DOCK-W",
-      priority: 64,
-      payload_kg: 480,
-      payload_size: "heavy",
-      urgency: "low",
-      status: "In Progress",
-      assigned_robot_id: "AMR-03",
-      created_at: new Date().toISOString(),
-    },
-  ]);
-  const [kpis, setKpis] = useState<KPIMetrics>(DEFAULT_KPI);
+function describeError(body: unknown, status: number): string {
+  const detail = (body as { detail?: unknown } | null)?.detail;
+  if (typeof detail === "string") return detail;
+  if (Array.isArray(detail)) return detail.map((d) => (d as { msg?: string }).msg ?? "invalid input").join("; ");
+  return `Request failed (${status})`;
+}
+
+const FleetContext = createContext<FleetSocketState | null>(null);
+
+export function FleetProvider({ children }: { children: ReactNode }) {
+  const { session, loading: authLoading } = useAuth();
+  const token = session?.access_token ?? null;
+  const canConnect = !authLoading && (!authRequired || token !== null);
+
+  const [fleetState, setFleetState] = useState<FleetState | null>(null);
+  const [world, setWorld] = useState<World | null>(null);
+  const [history, setHistory] = useState<FleetHistory>(EMPTY_HISTORY);
   const [isConnected, setIsConnected] = useState(false);
-  const [connectionMode, setConnectionMode] = useState<ConnectionMode>("sim");
+  const [error, setError] = useState<string | null>(null);
+  const lastSeq = useRef(0);
 
-  const wsRef = useRef<WebSocket | null>(null);
-  const tasksDoneRef = useRef(0);
-  const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const localTickIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  const authHeader = useCallback((): Record<string, string> => {
-    const activeToken = token || "demo-jwt-token-sih26123";
-    return { Authorization: `Bearer ${activeToken}` };
-  }, [token]);
-
-  const apiFetch = useCallback(
-    async (path: string, opts: RequestInit = {}): Promise<Response> => {
-      return fetch(`${apiBase}${path}`, {
-        ...opts,
-        headers: { "Content-Type": "application/json", ...authHeader(), ...(opts.headers ?? {}) },
-      });
-    },
-    [authHeader]
-  );
-
-  // ── Local Algorithmic Simulation Step (A* + Mutex Token passing) ─────────
-
-  const stepLocalSimulation = useCallback(() => {
-    setFleetState((prev) => {
-      if (!prev.running) return prev;
-
-      const nextTick = prev.tick + 1;
-      const nextMessages = prev.messages + 3;
-      let nextReservation = prev.reservation;
-      let nextLeaseUntil = prev.lease_until;
-      const newEvents: FleetEvent[] = [...prev.events];
-      const newP2PMessages: P2PMessagePacket[] = [...(prev.activeP2PMessages ?? [])];
-
-      const addP2P = (sender: RobotId, recipient: RobotId | "MESH", type: P2PMessagePacket["type"], payload: string) => {
-        newP2PMessages.unshift({
-          id: `p2p-${Date.now()}-${Math.random()}`,
-          sender,
-          recipient,
-          type,
-          payload,
-          timestamp: new Date().toLocaleTimeString(),
-        });
-        if (newP2PMessages.length > 8) newP2PMessages.pop();
-      };
-
-      const addEvent = (type: EventType, message: string) => {
-        newEvents.unshift({
-          time: `T+${(nextTick * 0.6).toFixed(1)}s`,
-          type,
-          message,
-        });
-        if (newEvents.length > 8) newEvents.pop();
-      };
-
-      // Check if lease expired or cleared
-      if (nextReservation && nextTick >= nextLeaseUntil) {
-        addEvent("LEASE", `${nextReservation} cleared Corridor C-14 & released distributed mutex lock`);
-        addP2P(nextReservation, "MESH", "MUTEX_GRANT", `RELEASE_MUTEX[Corridor C-14, Token returned to mesh]`);
-        nextReservation = null;
-        nextLeaseUntil = 0;
-      }
-
-      // Check approaching C-14 conflict point (500, 270)
-      const isApproaching = (r: RobotState) => {
-        if (r.path_index + 1 >= r.path.length) return false;
-        const nextPt = r.path[r.path_index + 1];
-        return Math.hypot(nextPt.x - 500, nextPt.y - 270) < 10 && r.progress > 0.45;
-      };
-
-      const contenders = prev.robots
-        .filter(isApproaching)
-        .sort((a, b) => b.priority - a.priority);
-
-      if (nextReservation === null && contenders.length > 0) {
-        const winner = contenders[0];
-        nextReservation = winner.id;
-        nextLeaseUntil = nextTick + 8;
-        addEvent("LEASE", `${winner.id} acquired C-14 Distributed Mutex (Priority=${winner.priority}, Lease=4.8s)`);
-        addP2P(winner.id, "MESH", "MUTEX_GRANT", `LEASE_ACQUIRED[Corridor C-14, Priority=${winner.priority}, Lease=4.8s]`);
-      }
-
-      // Move robots along algorithmic A* waypoints
-      const updatedRobots = prev.robots.map((robot) => {
-        const r = { ...robot, path: robot.path.map((p) => ({ ...p })), position: { ...robot.position } };
-
-        if (isApproaching(r) && nextReservation !== r.id) {
-          if (r.status !== "Yielding") {
-            r.status = "Yielding";
-            addEvent("LEASE", `${r.id} yielding at safety line | C-14 held by ${nextReservation}`);
-            if (nextReservation) {
-              addP2P(r.id, nextReservation, "YIELD_ACK", `YIELD_CONFIRM[Holding at safety buffer, Priority=${r.priority}]`);
-            }
-          }
-          return r;
-        }
-
-        const nextIndex = r.path_index + 1;
-        if (nextIndex >= r.path.length) {
-          // Completed current trajectory: dynamically pick new target or loop
-          r.status = "Moving";
-          r.battery = Math.min(100, r.battery + 0.8);
-          r.completed += 1;
-          // Dynamically compute next mission leg via A*
-          const startNode = findClosestNodeId(r.position);
-          const targets = ["DOCK-E", "DOCK-W", "CHARGE", "RACK A-03", "RACK B-02"];
-          const nextTarget = targets[(nextTick + r.completed) % targets.length];
-          const blocked = prev.aisle_blocked ? new Set(["AISLE-B07"]) : new Set<string>();
-          r.path = findShortestPath(startNode, nextTarget, blocked);
-          r.path_index = 0;
-          r.progress = 0;
-          r.position = { ...r.path[0] };
-          return r;
-        }
-
-        const start = r.path[r.path_index];
-        const end = r.path[nextIndex];
-        const dist = Math.hypot(end.x - start.x, end.y - start.y) || 1.0;
-        const speed = r.id === "AMR-02" ? 22 : 18;
-
-        // Dynamic obstacle checking along current segment
-        if (prev.aisle_blocked && r.status !== "Rerouting") {
-          const nextX = start.x + (end.x - start.x) * (r.progress + speed / dist);
-          const nextY = start.y + (end.y - start.y) * (r.progress + speed / dist);
-          if (Math.hypot(nextX - 640, nextY - 415) < 55) {
-            // Recompute dynamic path with D* / A* avoiding AISLE-B07
-            const currNode = findClosestNodeId(r.position);
-            const destNode = "DOCK-W";
-            r.path = findShortestPath(currNode, destNode, new Set(["AISLE-B07"]));
-            r.path_index = 0;
-            r.progress = 0;
-            r.status = "Rerouting";
-            addEvent("REROUTE", `${r.id} dynamically recalculated A* detour around blocked Aisle B-07`);
-            return r;
-          }
-        }
-
-        const nextProg = r.progress + speed / dist;
-        r.status = "Moving";
-        r.battery = Math.max(10, r.battery - 0.04);
-
-        if (nextProg >= 1) {
-          r.path_index = nextIndex;
-          r.progress = 0;
-          r.position = { ...end };
-        } else {
-          r.progress = nextProg;
-          r.position = {
-            x: start.x + (end.x - start.x) * nextProg,
-            y: start.y + (end.y - start.y) * nextProg,
-          };
-        }
-
-        return r;
-      });
-
-      if (nextTick % 6 === 0) {
-        addP2P("AMR-01", "AMR-02", "HEARTBEAT", "P2P_SYNC_PULSE[Latency 4.2ms, Mesh Quorum 3/3]");
-      }
-
-      const nextState: FleetState = {
-        ...prev,
-        tick: nextTick,
-        messages: nextMessages,
-        reservation: nextReservation,
-        lease_until: nextLeaseUntil,
-        robots: updatedRobots,
-        events: newEvents,
-        activeP2PMessages: newP2PMessages,
-      };
-
-      setKpis(computeKPIs(nextState, tasksDoneRef.current));
-      return nextState;
-    });
+  const applyState = useCallback((state: FleetState) => {
+    if (state.seq >= lastSeq.current) {
+      lastSeq.current = state.seq;
+      setFleetState(state);
+      setHistory((prev) => recordSample(prev, state));
+    }
   }, []);
 
-  // Tick loop runner
+  // Signing out drops everything the previous session could see.
   useEffect(() => {
-    if (localTickIntervalRef.current) {
-      clearInterval(localTickIntervalRef.current);
-      localTickIntervalRef.current = null;
+    if (!authLoading && authRequired && token === null) {
+      lastSeq.current = 0;
+      setFleetState(null);
+      setWorld(null);
+      setHistory(EMPTY_HISTORY);
     }
+  }, [authLoading, token]);
 
-    if (fleetState.running) {
-      localTickIntervalRef.current = setInterval(() => {
-        stepLocalSimulation();
-      }, 600);
-    }
+  // One WebSocket for the whole app, with exponential reconnect back-off.
+  useEffect(() => {
+    if (!canConnect) return;
+    let socket: WebSocket | null = null;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let attempt = 0;
+    let cancelled = false;
 
-    return () => {
-      if (localTickIntervalRef.current) {
-        clearInterval(localTickIntervalRef.current);
-        localTickIntervalRef.current = null;
-      }
-    };
-  }, [fleetState.running, stepLocalSimulation]);
-
-  // ── Fetch tasks list ───────────────────────────────────────────────────
-
-  const refreshTasks = useCallback(async () => {
-    try {
-      const res = await apiFetch("/api/tasks");
-      if (res.ok) {
-        const data = (await res.json()) as TaskRecord[];
-        setTasks(data);
-      }
-    } catch {
-      // Keep local tasks on disconnect
-    }
-  }, [apiFetch]);
-
-  // ── WebSocket connect/reconnect ────────────────────────────────────────
-
-  const connect = useCallback(() => {
-    if (wsRef.current) {
-      wsRef.current.close();
-      wsRef.current = null;
-    }
-
-    const wsUrl = token
-      ? `${wsBase}/ws/fleet?token=${encodeURIComponent(token)}`
-      : `${wsBase}/ws/fleet`;
-
-    let ws: WebSocket;
-    try {
-      ws = new WebSocket(wsUrl);
-    } catch {
-      setConnectionMode("sim");
-      setIsConnected(false);
-      return;
-    }
-
-    wsRef.current = ws;
-
-    ws.onopen = () => {
-      setIsConnected(true);
-      setConnectionMode("live");
-      void refreshTasks();
-    };
-
-    ws.onmessage = (ev) => {
+    const connect = () => {
+      if (cancelled) return;
       try {
-        const state = JSON.parse(ev.data as string) as FleetState;
-        setFleetState((prev) => ({
-          ...state,
-          activeP2PMessages: state.activeP2PMessages ?? prev.activeP2PMessages ?? [],
-        }));
-        setKpis(computeKPIs(state, tasksDoneRef.current));
+        // The token travels in the subprotocol header, never in the URL.
+        socket = token ? new WebSocket(`${wsBase}/ws/fleet`, ["edgefleet", token]) : new WebSocket(`${wsBase}/ws/fleet`);
       } catch {
-        // bad frame
+        timer = setTimeout(connect, 5000);
+        return;
       }
+      socket.onopen = () => {
+        attempt = 0;
+        lastSeq.current = 0; // each connection starts with a full snapshot; a restarted server resets seq
+        setIsConnected(true);
+      };
+      socket.onmessage = (event) => {
+        try {
+          applyState(JSON.parse(event.data as string) as FleetState);
+        } catch {
+          // ignore malformed frame
+        }
+      };
+      socket.onclose = () => {
+        setIsConnected(false);
+        if (!cancelled) timer = setTimeout(connect, Math.min(10000, 1000 * 2 ** attempt++));
+      };
+      socket.onerror = () => socket?.close();
     };
 
-    ws.onclose = () => {
-      setIsConnected(false);
-      setConnectionMode("sim");
-      wsRef.current = null;
-      reconnectTimerRef.current = setTimeout(() => {
-        connect();
-      }, 4000);
-    };
-
-    ws.onerror = () => {
-      ws.close();
-    };
-  }, [token, refreshTasks]);
-
-  useEffect(() => {
     connect();
     return () => {
-      if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
-      wsRef.current?.close();
-      wsRef.current = null;
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+      socket?.close();
     };
-  }, [connect]);
+  }, [token, canConnect, applyState]);
 
-  // ── Control commands ───────────────────────────────────────────────────
+  // The world (graph, fleet specs, mutex zones) is fetched, never hardcoded.
+  useEffect(() => {
+    if (!isConnected) return;
+    let cancelled = false;
+    fetch(`${apiBase}/api/world`, { headers: token ? { Authorization: `Bearer ${token}` } : {} })
+      .then((res) => (res.ok ? (res.json() as Promise<World>) : null))
+      .then((data) => {
+        if (data && !cancelled) setWorld(data);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [isConnected, token]);
+
+  const call = useCallback(
+    async <T,>(path: string, init: RequestInit = {}): Promise<T | null> => {
+      try {
+        const res = await fetch(`${apiBase}${path}`, {
+          ...init,
+          headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        });
+        if (!res.ok) {
+          setError(describeError(await res.json().catch(() => null), res.status));
+          return null;
+        }
+        return res.status === 204 ? (true as unknown as T) : ((await res.json()) as T);
+      } catch {
+        setError("Backend unreachable — command was not sent");
+        return null;
+      }
+    },
+    [token]
+  );
+
+  const post = useCallback(
+    async (path: string, body?: unknown): Promise<boolean> => {
+      const state = await call<FleetState>(path, { method: "POST", body: body === undefined ? undefined : JSON.stringify(body) });
+      if (state && typeof state === "object" && "robots" in state) applyState(state);
+      return state !== null;
+    },
+    [call, applyState]
+  );
 
   const sendControl = useCallback(
-    async (action: "start" | "pause" | "reset" | "step") => {
-      if (isConnected) {
-        try {
-          if (action === "reset") {
-            await apiFetch("/api/fleet/reset", { method: "POST" });
-          } else {
-            const running = action === "start";
-            await apiFetch("/api/fleet/simulation", {
-              method: "POST",
-              body: JSON.stringify({ running }),
-            });
-          }
-        } catch {
-          // fallback
-        }
-      }
-
-      setFleetState((prev) => {
-        if (action === "reset") {
-          const fresh = createInitialState();
-          setKpis(computeKPIs(fresh, tasksDoneRef.current));
-          return fresh;
-        }
-
-        const running = action === "start";
-        const label = running ? "resumed" : "paused";
-        const newEvents: FleetEvent[] = [
-          {
-            time: `T+${(prev.tick * 0.6).toFixed(1)}s`,
-            type: "HEARTBEAT",
-            message: `Simulation ${label} · Dynamic peer arbitration loop ${running ? "active" : "standby"}`,
-          },
-          ...prev.events,
-        ];
-        if (newEvents.length > 8) newEvents.pop();
-
-        const updated = {
-          ...prev,
-          running,
-          events: newEvents,
-        };
-        setKpis(computeKPIs(updated, tasksDoneRef.current));
-        return updated;
-      });
-    },
-    [isConnected, apiFetch]
+    (action: "start" | "pause" | "reset") =>
+      action === "reset" ? post("/api/fleet/reset") : post("/api/fleet/simulation", { running: action === "start" }),
+    [post]
   );
 
-  // ── Task Management (Creation, Attribute Updates, Size Management, Bidding) ──
+  // Task changes reach every client through the WebSocket snapshot; the response is returned to the caller.
+  const createTask = useCallback((input: TaskCreateInput) => call<TaskRecord>("/api/tasks", { method: "POST", body: JSON.stringify(input) }), [call]);
+  const updateTask = useCallback((taskId: string, input: TaskUpdateInput) => call<TaskRecord>(`/api/tasks/${encodeURIComponent(taskId)}`, { method: "PATCH", body: JSON.stringify(input) }), [call]);
+  const deleteTask = useCallback(async (taskId: string) => (await call<boolean>(`/api/tasks/${encodeURIComponent(taskId)}`, { method: "DELETE" })) !== null, [call]);
+  const completeTask = useCallback(async (taskId: string) => (await call<TaskRecord>(`/api/tasks/${encodeURIComponent(taskId)}/complete`, { method: "POST" })) !== null, [call]);
 
-  const createTask = useCallback(
-    async (
-      input: TaskCreateInput | string,
-      destArg?: string,
-      priorityArg?: number
-    ): Promise<TaskRecord | null> => {
-      let pickup = "";
-      let destination = "";
-      let priority = 50;
-      let payload_kg = 150;
-      let payload_size: PayloadSize = "medium";
-      let urgency: UrgencyLevel = "standard";
-
-      if (typeof input === "string") {
-        pickup = input;
-        destination = destArg ?? "DOCK-E";
-        priority = priorityArg ?? 50;
-      } else {
-        pickup = input.pickup;
-        destination = input.destination;
-        priority = input.priority;
-        payload_kg = input.payload_kg ?? 150;
-        payload_size = input.payload_size ?? "medium";
-        urgency = input.urgency ?? "standard";
-      }
-
-      // Dynamic Contract-Net Protocol (CNP) Auction among AMRs
-      let bestRobot: RobotId | null = null;
-      let maxScore = -Infinity;
-      for (const robot of fleetState.robots) {
-        const { bidScore, isEligible } = calculateAuctionBid(robot, pickup, payload_kg, priority);
-        if (isEligible && bidScore > maxScore) {
-          maxScore = bidScore;
-          bestRobot = robot.id;
-        }
-      }
-
-      const newTask: TaskRecord = {
-        id: `TSK-${Math.floor(100 + Math.random() * 900)}`,
-        pickup,
-        destination,
-        priority,
-        payload_kg,
-        payload_size,
-        urgency,
-        status: bestRobot ? "In Progress" : "Queued",
-        assigned_robot_id: bestRobot,
-        created_at: new Date().toISOString(),
-      };
-
-      if (isConnected) {
-        try {
-          const res = await apiFetch("/api/tasks", {
-            method: "POST",
-            body: JSON.stringify({
-              pickup,
-              destination,
-              priority,
-              payload_kg,
-              payload_size,
-              urgency,
-            }),
-          });
-          if (res.ok) {
-            const serverTask = (await res.json()) as TaskRecord;
-            setTasks((prev) => [serverTask, ...prev]);
-            tasksDoneRef.current += 1;
-            return serverTask;
-          }
-        } catch {
-          // fallback to local
-        }
-      }
-
-      setTasks((prev) => [newTask, ...prev]);
-      tasksDoneRef.current += 1;
-
-      // Update AMR mission and calculate A* path to task pickup & destination
-      setFleetState((prev) => {
-        const updatedRobots = prev.robots.map((r) => {
-          if (r.id === bestRobot) {
-            const blocked = prev.aisle_blocked ? new Set(["AISLE-B07"]) : new Set<string>();
-            const startNode = findClosestNodeId(r.position);
-            const pathToPickup = findShortestPath(startNode, pickup, blocked);
-            const pathToDest = findShortestPath(pickup, destination, blocked);
-            const fullPath = [...pathToPickup, ...pathToDest.slice(1)];
-
-            return {
-              ...r,
-              task: `${newTask.id}: ${pickup} -> ${destination} (${payload_kg}kg)`,
-              status: "Moving" as const,
-              path: fullPath,
-              path_index: 0,
-              progress: 0,
-              priority: Math.max(r.priority, priority),
-              current_payload_kg: payload_kg,
-            };
-          }
-          return r;
-        });
-
-        const newP2P: P2PMessagePacket[] = [
-          {
-            id: `p2p-auction-${Date.now()}`,
-            sender: bestRobot ?? "AMR-01",
-            recipient: "MESH",
-            type: "TASK_BID",
-            payload: `AUCTION_WIN[${newTask.id}, Payload=${payload_kg}kg (${payload_size}), Pri=${priority}, Score=${maxScore.toFixed(1)}]`,
-            timestamp: new Date().toLocaleTimeString(),
-          },
-          ...(prev.activeP2PMessages ?? []),
-        ];
-
-        return {
-          ...prev,
-          messages: prev.messages + 3,
-          robots: updatedRobots,
-          activeP2PMessages: newP2P,
-          events: [
-            {
-              time: `T+${(prev.tick * 0.6).toFixed(1)}s`,
-              type: "HANDOFF",
-              message: `${bestRobot ?? "Fleet"} won ${newTask.id} (${payload_kg}kg ${payload_size}) via Contract Net Protocol (score: ${maxScore.toFixed(1)})`,
-            },
-            ...prev.events,
-          ],
-        };
-      });
-
-      return newTask;
-    },
-    [isConnected, apiFetch, fleetState.robots]
-  );
-
-  const updateTask = useCallback(
-    async (taskId: string, input: TaskUpdateInput): Promise<TaskRecord | null> => {
-      if (isConnected) {
-        try {
-          const res = await apiFetch(`/api/tasks/${taskId}`, {
-            method: "PATCH",
-            body: JSON.stringify(input),
-          });
-          if (res.ok) {
-            const updated = (await res.json()) as TaskRecord;
-            setTasks((prev) => prev.map((t) => (t.id === taskId ? updated : t)));
-            return updated;
-          }
-        } catch {
-          // fallback
-        }
-      }
-
-      let updatedTask: TaskRecord | null = null;
-      setTasks((prev) =>
-        prev.map((t) => {
-          if (t.id === taskId) {
-            updatedTask = {
-              ...t,
-              ...input,
-              payload_kg: input.payload_kg ?? t.payload_kg,
-              payload_size: input.payload_size ?? t.payload_size,
-              urgency: input.urgency ?? t.urgency,
-              priority: input.priority ?? t.priority,
-            };
-            return updatedTask;
-          }
-          return t;
-        })
-      );
-
-      if (updatedTask) {
-        setFleetState((prev) => ({
-          ...prev,
-          events: [
-            {
-              time: `T+${(prev.tick * 0.6).toFixed(1)}s`,
-              type: "HANDOFF",
-              message: `Task ${taskId} attributes updated (Size: ${input.payload_size ?? "unchanged"}, Weight: ${input.payload_kg ?? "unchanged"}kg, Pri: ${input.priority ?? "unchanged"})`,
-            },
-            ...prev.events,
-          ],
-        }));
-      }
-
-      return updatedTask;
-    },
-    [isConnected, apiFetch]
-  );
-
-  const deleteTask = useCallback(
-    async (taskId: string): Promise<boolean> => {
-      if (isConnected) {
-        try {
-          const res = await apiFetch(`/api/tasks/${taskId}`, { method: "DELETE" });
-          if (res.ok) {
-            setTasks((prev) => prev.filter((t) => t.id !== taskId));
-            return true;
-          }
-        } catch {
-          // fallback
-        }
-      }
-
-      setTasks((prev) => prev.filter((t) => t.id !== taskId));
-      setFleetState((prev) => ({
-        ...prev,
-        events: [
-          {
-            time: `T+${(prev.tick * 0.6).toFixed(1)}s`,
-            type: "HANDOFF",
-            message: `Task ${taskId} withdrawn & removed from fleet allocation`,
-          },
-          ...prev.events,
-        ],
-      }));
-      return true;
-    },
-    [isConnected, apiFetch]
-  );
-
-  const completeTask = useCallback(
-    async (taskId: string) => {
-      if (isConnected) {
-        try {
-          const res = await apiFetch(`/api/tasks/${taskId}/complete`, { method: "POST" });
-          if (res.ok) {
-            const updated = (await res.json()) as TaskRecord;
-            setTasks((prev) => prev.map((t) => (t.id === taskId ? updated : t)));
-            tasksDoneRef.current += 1;
-            return;
-          }
-        } catch {
-          // fallback
-        }
-      }
-
-      setTasks((prev) =>
-        prev.map((t) => (t.id === taskId ? { ...t, status: "Completed" as const } : t))
-      );
-      tasksDoneRef.current += 1;
-      setFleetState((prev) => ({
-        ...prev,
-        completed_tasks: prev.completed_tasks + 1,
-        events: [
-          {
-            time: `T+${(prev.tick * 0.6).toFixed(1)}s`,
-            type: "HEARTBEAT",
-            message: `Task ${taskId} completed · Mission objective verified by peer mesh consensus`,
-          },
-          ...prev.events,
-        ],
-      }));
-    },
-    [isConnected, apiFetch]
-  );
-
+  const setBlockage = useCallback((nodeId: string, blocked: boolean) => post("/api/fleet/blockages", { aisle_id: nodeId, blocked }), [post]);
+  // Toggle: with nothing blocked, block `nodeId`; otherwise clear every active blockage.
+  const blockedNodes = fleetState?.blocked_nodes;
   const injectBlockage = useCallback(
-    async (aisleId = "B-07") => {
-      if (isConnected) {
-        try {
-          await apiFetch("/api/fleet/blockages", {
-            method: "POST",
-            body: JSON.stringify({ aisle_id: aisleId }),
-          });
-        } catch {
-          // fallback
-        }
-      }
-
-      setFleetState((prev) => {
-        if (prev.aisle_blocked) {
-          // Clear blockage and recalculate optimal A* routes
-          const restoredRobots = prev.robots.map((r) => {
-            const startNode = findClosestNodeId(r.position);
-            const targetNode = r.id === "AMR-03" ? "DOCK-W" : "DOCK-E";
-            return {
-              ...r,
-              path: findShortestPath(startNode, targetNode),
-              path_index: 0,
-              progress: 0,
-              status: "Moving" as const,
-              task: r.id === "AMR-03" ? "Pick P-23 -> Dock W" : r.task,
-            };
-          });
-
-          return {
-            ...prev,
-            aisle_blocked: false,
-            robots: restoredRobots,
-            events: [
-              {
-                time: `T+${(prev.tick * 0.6).toFixed(1)}s`,
-                type: "REROUTE",
-                message: `Obstacle cleared at Aisle ${aisleId} · Optimal A* paths restored across warehouse grid`,
-              },
-              ...prev.events,
-            ],
-          };
-        }
-
-        // Apply obstacle: Aisle B-07 impassable. Compute dynamic D* Lite detour
-        const blocked = new Set(["AISLE-B07"]);
-        const updatedRobots = prev.robots.map((r) => {
-          if (r.id === "AMR-03") {
-            const startNode = findClosestNodeId(r.position);
-            const detourPath = findShortestPath(startNode, "DOCK-W", blocked);
-            return {
-              ...r,
-              path: detourPath,
-              path_index: 0,
-              progress: 0,
-              status: "Rerouting" as const,
-              task: "D* Lite Detour around B-07",
-            };
-          }
-          return r;
-        });
-
-        const newP2P: P2PMessagePacket[] = [
-          {
-            id: `p2p-block-${Date.now()}`,
-            sender: "AMR-03",
-            recipient: "MESH",
-            type: "OBSTACLE_ALERT",
-            payload: `OBSTACLE_DETECTED[Aisle B-07 impassable, D* Lite recomputed via perimeter transit]`,
-            timestamp: new Date().toLocaleTimeString(),
-          },
-          ...(prev.activeP2PMessages ?? []),
-        ];
-
-        return {
-          ...prev,
-          aisle_blocked: true,
-          messages: prev.messages + 6,
-          robots: updatedRobots,
-          activeP2PMessages: newP2P,
-          events: [
-            {
-              time: `T+${(prev.tick * 0.6).toFixed(1)}s`,
-              type: "REROUTE",
-              message: `AMR-03 detected obstacle in Aisle ${aisleId} · D* Lite real-time detour computed avoiding node AISLE-B07`,
-            },
-            ...prev.events,
-          ],
-        };
-      });
+    async (nodeId = "B-07") => {
+      if (!blockedNodes || blockedNodes.length === 0) return setBlockage(nodeId, true);
+      return (await Promise.all(blockedNodes.map((id) => setBlockage(id, false)))).every(Boolean);
     },
-    [isConnected, apiFetch]
+    [setBlockage, blockedNodes]
   );
-
   const requestReservation = useCallback(
-    async (robotId: RobotId, corridorId = "C-14", leaseSeconds = 4.8) => {
-      if (isConnected) {
-        try {
-          await apiFetch("/api/fleet/reservations", {
-            method: "POST",
-            body: JSON.stringify({
-              robot_id: robotId,
-              corridor_id: corridorId,
-              lease_seconds: leaseSeconds,
-            }),
-          });
-        } catch {
-          // fallback
-        }
-      }
-
-      setFleetState((prev) => {
-        const leaseUntil = prev.tick + Math.round(leaseSeconds / 0.6);
-        return {
-          ...prev,
-          reservation: robotId,
-          lease_until: leaseUntil,
-          events: [
-            {
-              time: `T+${(prev.tick * 0.6).toFixed(1)}s`,
-              type: "LEASE",
-              message: `${robotId} acquired ${corridorId} Distributed Mutex (Priority scoring win, ${leaseSeconds}s lease)`,
-            },
-            ...prev.events,
-          ],
-        };
-      });
-    },
-    [isConnected, apiFetch]
+    (robotId: RobotId, corridorId = "C-14", leaseSeconds = 4.8) => post("/api/fleet/reservations", { robot_id: robotId, corridor_id: corridorId, lease_seconds: leaseSeconds }),
+    [post]
   );
-
   const publishIntent = useCallback(
-    async (robotId: RobotId, corridorId = "C-14", etaSeconds = 5.0) => {
-      if (isConnected) {
-        try {
-          await apiFetch("/api/fleet/intents", {
-            method: "POST",
-            body: JSON.stringify({
-              robot_id: robotId,
-              corridor_id: corridorId,
-              eta_seconds: etaSeconds,
-            }),
-          });
-        } catch {
-          // fallback
-        }
-      }
-
-      setFleetState((prev) => ({
-        ...prev,
-        messages: prev.messages + 1,
-        events: [
-          {
-            time: `T+${(prev.tick * 0.6).toFixed(1)}s`,
-            type: "INTENT",
-            message: `${robotId} published ${corridorId} space-time intent (ETA ${etaSeconds.toFixed(1)}s) to P2P mesh`,
-          },
-          ...prev.events,
-        ],
-      }));
-    },
-    [isConnected, apiFetch]
+    (robotId: RobotId, corridorId = "C-14", etaSeconds = 5.0) => post("/api/fleet/intents", { robot_id: robotId, corridor_id: corridorId, eta_seconds: etaSeconds }),
+    [post]
+  );
+  const setRobotBattery = useCallback(
+    (robotId: RobotId, battery = 22.0) => post("/api/fleet/faults/battery", { robot_id: robotId, battery }),
+    [post]
+  );
+  const simulateAgentDropout = useCallback(
+    (robotId: RobotId) => post("/api/fleet/faults/dropout", { robot_id: robotId }),
+    [post]
   );
 
-  const EMPTY_ROBOTS: RobotState[] = [];
-  const EMPTY_EVENTS: FleetEvent[] = [];
-  const EMPTY_P2P: P2PMessagePacket[] = [];
+  const robots = fleetState?.robots ?? EMPTY_ROBOTS;
+  const robotColor = useCallback(
+    (robotId?: string | null) => (robotId ? robots.find((r) => r.id === robotId)?.color ?? world?.robots.find((r) => r.id === robotId)?.color : undefined) ?? NEUTRAL_COLOR,
+    [robots, world]
+  );
 
-  return {
-    fleetState,
-    robots: fleetState?.robots ?? EMPTY_ROBOTS,
-    events: fleetState?.events ?? EMPTY_EVENTS,
-    p2pMessages: fleetState?.activeP2PMessages ?? EMPTY_P2P,
-    tasks,
-    kpis,
-    connectionMode,
-    isConnected,
-    sendControl,
-    createTask,
-    updateTask,
-    deleteTask,
-    completeTask,
-    injectBlockage,
-    requestReservation,
-    publishIntent,
-    refreshTasks,
-  };
+  const kpis = useMemo<KPIMetrics>(() => {
+    const k = fleetState?.kpis;
+    return k
+      ? {
+          fleetUtilizationPct: k.fleet_utilization_pct,
+          avgBatteryPct: k.avg_battery_pct,
+          collisionCount: k.collision_count,
+          activeLeases: k.active_leases,
+          meshHealthPct: k.operational_pct,
+          completedTotal: k.completed_total,
+          queuedTasks: k.queued_tasks,
+          tick: k.tick,
+          tasksPerHour: k.tasks_per_hour,
+        }
+      : EMPTY_KPI;
+  }, [fleetState?.kpis]);
+
+  const value = useMemo<FleetSocketState>(
+    () => ({
+      fleetState,
+      world,
+      history,
+      robots,
+      events: fleetState?.events ?? EMPTY_EVENTS,
+      p2pMessages: fleetState?.p2p ?? EMPTY_P2P,
+      tasks: fleetState?.tasks ?? EMPTY_TASKS,
+      kpis,
+      connectionMode: isConnected ? "live" : "offline",
+      isConnected,
+      needsLogin: !authLoading && authRequired && token === null,
+      error,
+      clearError: () => setError(null),
+      robotColor,
+      sendControl,
+      createTask,
+      updateTask,
+      deleteTask,
+      completeTask,
+      setBlockage,
+      injectBlockage,
+      requestReservation,
+      publishIntent,
+      setRobotBattery,
+      simulateAgentDropout,
+    }),
+    [fleetState, world, history, robots, kpis, isConnected, authLoading, token, error, robotColor, sendControl, createTask, updateTask, deleteTask, completeTask, setBlockage, injectBlockage, requestReservation, publishIntent, setRobotBattery, simulateAgentDropout]
+  );
+
+  return createElement(FleetContext.Provider, { value }, children);
+}
+
+/** Shared fleet state. The optional argument is ignored (kept so existing call sites keep compiling). */
+export function useFleetSocket(_token?: string | null): FleetSocketState {
+  void _token;
+  const context = useContext(FleetContext);
+  if (!context) throw new Error("useFleetSocket must be used inside <FleetProvider>");
+  return context;
 }

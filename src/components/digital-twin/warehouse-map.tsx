@@ -1,374 +1,321 @@
-import type { RobotId, RobotState } from "@/lib/fleet-contract";
+import type { P2PMessagePacket, RobotId, RobotState, World, WorldNode } from "@/lib/fleet-contract";
 import { RobotMarker } from "@/components/digital-twin/robot-marker";
 
 interface WarehouseMapProps {
+  /** Topology from GET /api/world. Nothing on this map is drawn from constants. */
+  world: World | null;
   robots: RobotState[];
-  reservation: RobotId | null;
-  aisleBlocked: boolean;
+  /** mutex zone id -> robot currently holding its lease */
+  leases: Record<string, RobotId>;
+  blockedNodes: string[];
+  p2p?: P2PMessagePacket[];
   showRadar?: boolean;
   showHeatmap?: boolean;
+  showP2PBeams?: boolean;
   onSelectRobot?: (robot: RobotState) => void;
+  style?: React.CSSProperties;
+  className?: string;
+}
+
+const BEAM_COLORS: Record<string, string> = {
+  YIELD_ACK: "#F59E0B",
+  MUTEX_REQ: "#A855F7",
+  MUTEX_GRANT: "#A855F7",
+  OBSTACLE_ALERT: "#EF4444",
+  TASK_BID: "#06B6D4",
+  HEARTBEAT: "#64748B",
+};
+
+const PAD = 70;
+
+function polyline(points: { x: number; y: number }[]) {
+  return points.map((p) => `${p.x},${p.y}`).join(" ");
 }
 
 export function WarehouseMap({
+  world,
   robots,
-  reservation,
-  aisleBlocked,
+  leases,
+  blockedNodes,
+  p2p = [],
   showRadar = true,
   showHeatmap = false,
+  showP2PBeams = true,
   onSelectRobot,
+  style,
+  className,
 }: WarehouseMapProps) {
-  const activePath = (points: { x: number; y: number }[]) =>
-    points.map((p) => `${p.x},${p.y}`).join(" ");
+  if (!world) {
+    return (
+      <svg className={`warehouse-svg-canvas ${className ?? ""}`.trim()} style={style} viewBox="0 0 1000 600" role="img" aria-label="Warehouse floor map">
+        <rect width="1000" height="600" fill="var(--map-floor)" />
+        <text x="500" y="300" textAnchor="middle" fill="var(--text-muted)" fontSize="14" fontFamily="var(--font-mono)">
+          No live floor data yet. Sign in and make sure the fleet backend is running.
+        </text>
+      </svg>
+    );
+  }
 
-  const r1 = robots.find((r) => r.id === "AMR-01");
-  const r2 = robots.find((r) => r.id === "AMR-02");
-  const r3 = robots.find((r) => r.id === "AMR-03");
+  const nodes = new Map<string, WorldNode>(world.nodes.map((n) => [n.id, n]));
+  const xs = world.nodes.map((n) => n.x);
+  const ys = world.nodes.map((n) => n.y);
+  const minX = Math.min(...xs) - PAD;
+  const minY = Math.min(...ys) - PAD;
+  const width = Math.max(...xs) + PAD - minX;
+  const height = Math.max(...ys) + PAD - minY;
+
+  const racks = world.nodes.filter((n) => n.type === "rack");
+  const bays = world.nodes.filter((n) => n.type === "dock" || n.type === "charge");
+  const yard = world.nodes.filter((n) => n.type === "transit" || n.type === "corridor");
+  const zones = world.mutex_zones.map((id) => nodes.get(id)).filter((n): n is WorldNode => Boolean(n));
+  const byId = new Map(robots.map((r) => [r.id, r]));
+
+  const beams = showP2PBeams
+    ? p2p
+        .filter((m) => m.recipient !== "MESH" && byId.has(m.sender) && byId.has(m.recipient))
+        .slice(0, 6)
+    : [];
+  const congested = robots.filter((r) => r.status === "Yielding" || r.status === "Blocked");
 
   return (
     <svg
-      className="warehouse-svg-canvas"
-      viewBox="0 0 1000 600"
+      className={`warehouse-svg-canvas ${className ?? ""}`.trim()}
+      style={style}
+      viewBox={`${minX} ${minY} ${width} ${height}`}
       role="img"
-      aria-label="High-Fidelity 2D Warehouse Digital Twin Floor Map"
+      aria-label="Live warehouse digital twin floor map"
     >
       <defs>
-        {/* Floor Grid Pattern */}
         <pattern id="floor-grid-pattern" width="25" height="25" patternUnits="userSpaceOnUse">
           <path d="M 25 0 L 0 0 0 25" fill="none" stroke="var(--map-grid)" strokeWidth="0.75" opacity="0.6" />
           <circle cx="0" cy="0" r="0.7" fill="var(--map-grid)" opacity="0.8" />
         </pattern>
-
-        {/* Hazard Stripes Pattern for Hold Lines */}
         <pattern id="hazard-stripes" width="10" height="10" patternTransform="rotate(45 0 0)" patternUnits="userSpaceOnUse">
           <line x1="0" y1="0" x2="0" y2="10" stroke="var(--map-hazard-stripe-1, #D97706)" strokeWidth="4" />
           <line x1="5" y1="0" x2="5" y2="10" stroke="var(--map-hazard-stripe-2, var(--map-floor))" strokeWidth="4" />
         </pattern>
-
-        {/* Dynamic Radar Beam Linear Gradient */}
         <linearGradient id="radar-beam-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
           <stop offset="0%" stopColor="var(--status-active)" stopOpacity="0.0" />
           <stop offset="70%" stopColor="var(--status-active)" stopOpacity="0.25" />
           <stop offset="100%" stopColor="var(--status-active)" stopOpacity="0.9" />
         </linearGradient>
-
-        {/* Traffic Heatmap Gradient */}
-        <radialGradient id="traffic-heat-c14" cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stopColor="var(--status-warning)" stopOpacity="0.35" />
+        <radialGradient id="traffic-heat" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stopColor="var(--status-warning)" stopOpacity="0.4" />
           <stop offset="60%" stopColor="var(--status-warning)" stopOpacity="0.15" />
           <stop offset="100%" stopColor="var(--status-warning)" stopOpacity="0.0" />
         </radialGradient>
       </defs>
 
-      {/* Floor Canvas Background */}
-      <rect width="1000" height="600" fill="var(--map-floor)" />
-      <rect x="20" y="20" width="960" height="560" fill="url(#floor-grid-pattern)" stroke="var(--map-floor-border)" strokeWidth="1" rx="4" />
+      <rect x={minX} y={minY} width={width} height={height} fill="var(--map-floor)" />
+      <rect x={minX + 10} y={minY + 10} width={width - 20} height={height - 20} fill="url(#floor-grid-pattern)" stroke="var(--map-floor-border)" strokeWidth="1" rx="4" />
 
-      {/* Optional Traffic Congestion Heatmap */}
+      {/* Congestion: where robots are actually waiting right now */}
       {showHeatmap && (
         <g style={{ pointerEvents: "none" }}>
-          <circle cx="500" cy="270" r="140" fill="url(#traffic-heat-c14)" />
-          <circle cx="370" cy="380" r="90" fill="url(#traffic-heat-c14)" />
-          <circle cx="740" cy="490" r="90" fill="url(#traffic-heat-c14)" />
+          {congested.map((r) => (
+            <circle key={r.id} cx={r.position.x} cy={r.position.y} r="80" fill="url(#traffic-heat)" />
+          ))}
         </g>
       )}
 
-      {/* Continuous 360 LiDAR / Radar Sweep Beam */}
-      {showRadar && (
+      {/* LiDAR sweep visual centred on the first mutex zone */}
+      {showRadar && zones[0] && (
         <g style={{ pointerEvents: "none" }}>
-          <circle cx="500" cy="270" r="320" fill="none" stroke="var(--status-active)" strokeWidth="0.8" opacity="0.15" strokeDasharray="4 6" />
-          <circle cx="500" cy="270" r="160" fill="none" stroke="var(--status-active)" strokeWidth="0.6" opacity="0.1" />
+          <circle cx={zones[0].x} cy={zones[0].y} r="320" fill="none" stroke="var(--status-active)" strokeWidth="0.8" opacity="0.15" strokeDasharray="4 6" />
+          <circle cx={zones[0].x} cy={zones[0].y} r="160" fill="none" stroke="var(--status-active)" strokeWidth="0.6" opacity="0.1" />
           <line
-            x1="500"
-            y1="270"
-            x2="820"
-            y2="270"
+            x1={zones[0].x}
+            y1={zones[0].y}
+            x2={zones[0].x + 320}
+            y2={zones[0].y}
             stroke="url(#radar-beam-gradient)"
             strokeWidth="2"
             className="animate-radar-sweep"
-            style={{ transformOrigin: "500px 270px" }}
+            style={{ transformOrigin: `${zones[0].x}px ${zones[0].y}px` }}
           />
         </g>
       )}
 
-      {/* Racks & Shelves — High Bay Aisles */}
+      {/* Lanes: one line per graph edge */}
+      <g fill="none" stroke="var(--map-lane)" strokeLinecap="round">
+        {world.edges.map(([a, b]) => {
+          const from = nodes.get(a);
+          const to = nodes.get(b);
+          if (!from || !to) return null;
+          return (
+            <g key={`${a}|${b}`}>
+              <line x1={from.x} y1={from.y} x2={to.x} y2={to.y} strokeWidth="12" opacity="0.14" />
+              <line x1={from.x} y1={from.y} x2={to.x} y2={to.y} strokeWidth="1" strokeDasharray="3 5" opacity="0.7" />
+            </g>
+          );
+        })}
+      </g>
+
+      {/* Racks */}
       <g fill="var(--map-rack)" stroke="var(--map-rack-stroke)" strokeWidth="1">
-        {/* Row 1 Racks */}
-        <rect x="40" y="40" width="200" height="70" rx="3" />
-        <text x="140" y="80" textAnchor="middle" fill="var(--map-rack-text)" fontSize="9" fontWeight="600" fontFamily="var(--font-mono)">
-          RACK A-01 [BULK]
-        </text>
-
-        <rect x="280" y="40" width="180" height="70" rx="3" />
-        <text x="370" y="80" textAnchor="middle" fill="var(--map-rack-text)" fontSize="9" fontWeight="600" fontFamily="var(--font-mono)">
-          RACK A-02 [PARTS]
-        </text>
-
-        <rect x="540" y="40" width="180" height="70" rx="3" />
-        <text x="630" y="80" textAnchor="middle" fill="var(--map-rack-text)" fontSize="9" fontWeight="600" fontFamily="var(--font-mono)">
-          RACK A-03 [FAST]
-        </text>
-
-        <rect x="760" y="40" width="200" height="70" rx="3" />
-        <text x="860" y="80" textAnchor="middle" fill="var(--map-rack-text)" fontSize="9" fontWeight="600" fontFamily="var(--font-mono)">
-          RACK A-04 [RESERVE]
-        </text>
-
-        {/* Row 2 Racks */}
-        <rect x="40" y="140" width="200" height="75" rx="3" />
-        <text x="140" y="182" textAnchor="middle" fill="var(--map-rack-text)" fontSize="9" fontWeight="600" fontFamily="var(--font-mono)">
-          RACK B-01 [AVIONICS]
-        </text>
-
-        <rect x="280" y="140" width="180" height="75" rx="3" />
-        <text x="370" y="182" textAnchor="middle" fill="var(--map-rack-text)" fontSize="9" fontWeight="600" fontFamily="var(--font-mono)">
-          RACK B-02 [ASSEMBLY]
-        </text>
-
-        <rect x="540" y="140" width="180" height="75" rx="3" />
-        <text x="630" y="182" textAnchor="middle" fill="var(--map-rack-text)" fontSize="9" fontWeight="600" fontFamily="var(--font-mono)">
-          RACK B-03 [HARNESS]
-        </text>
-
-        <rect x="760" y="140" width="200" height="75" rx="3" />
-        <text x="860" y="182" textAnchor="middle" fill="var(--map-rack-text)" fontSize="9" fontWeight="600" fontFamily="var(--font-mono)">
-          RACK B-04 [OPTICS]
-        </text>
-
-        {/* Row 3 Racks */}
-        <rect x="40" y="325" width="200" height="75" rx="3" />
-        <text x="140" y="367" textAnchor="middle" fill="var(--map-rack-text)" fontSize="9" fontWeight="600" fontFamily="var(--font-mono)">
-          RACK C-01 [STAGING]
-        </text>
-
-        <rect x="280" y="325" width="180" height="75" rx="3" />
-        <text x="370" y="367" textAnchor="middle" fill="var(--map-rack-text)" fontSize="9" fontWeight="600" fontFamily="var(--font-mono)">
-          RACK C-02 [FINISHED]
-        </text>
-
-        <rect x="540" y="325" width="180" height="75" rx="3" />
-        <text x="630" y="367" textAnchor="middle" fill="var(--map-rack-text)" fontSize="9" fontWeight="600" fontFamily="var(--font-mono)">
-          RACK C-03 [BUFFER]
-        </text>
-
-        <rect x="760" y="325" width="200" height="75" rx="3" />
-        <text x="860" y="367" textAnchor="middle" fill="var(--map-rack-text)" fontSize="9" fontWeight="600" fontFamily="var(--font-mono)">
-          RACK C-04 [PACKAGING]
-        </text>
-
-        {/* Row 4 Racks */}
-        <rect x="40" y="440" width="200" height="70" rx="3" />
-        <text x="140" y="480" textAnchor="middle" fill="var(--map-rack-text)" fontSize="9" fontWeight="600" fontFamily="var(--font-mono)">
-          RACK D-01 [RETURNS]
-        </text>
-
-        <rect x="280" y="440" width="180" height="70" rx="3" />
-        <text x="370" y="480" textAnchor="middle" fill="var(--map-rack-text)" fontSize="9" fontWeight="600" fontFamily="var(--font-mono)">
-          RACK D-02 [PALLETS]
-        </text>
-
-        <rect x="540" y="440" width="180" height="70" rx="3" />
-        <text x="630" y="480" textAnchor="middle" fill="var(--map-rack-text)" fontSize="9" fontWeight="600" fontFamily="var(--font-mono)">
-          RACK D-03 [BUFFER]
-        </text>
-
-        <rect x="760" y="440" width="200" height="70" rx="3" />
-        <text x="860" y="480" textAnchor="middle" fill="var(--map-rack-text)" fontSize="9" fontWeight="600" fontFamily="var(--font-mono)">
-          RACK D-04 [RECYCLE]
-        </text>
+        {racks.map((n) => (
+          <rect key={n.id} x={n.x - 48} y={n.y - 24} width="96" height="48" rx="3">
+            <title>{n.label}</title>
+          </rect>
+        ))}
+      </g>
+      <g fill="var(--map-rack-text)" stroke="none" fontFamily="var(--font-mono)" fontWeight="700" textAnchor="middle">
+        {racks.map((n) => {
+          const [id, tag] = n.label.split(" [");
+          return (
+            <text key={n.id} x={n.x} y={n.y - 2} fontSize="9.5" letterSpacing="0.04em">
+              {id}
+              {tag && (
+                <tspan x={n.x} dy="12" fontSize="8" opacity="0.8">
+                  {tag.replace("]", "")}
+                </tspan>
+              )}
+            </text>
+          );
+        })}
       </g>
 
-      {/* Orthogonal AGV Highway Network */}
-      <g stroke="var(--map-lane)" strokeWidth="1" strokeDasharray="3 5" opacity="0.6">
-        <path d="M 40 270 L 960 270" />
-        <path d="M 500 40 L 500 560" />
-        <path d="M 40 415 L 960 415" />
-        <path d="M 720 415 L 720 505 L 280 505 L 280 415" />
-      </g>
-
-      {/* Facility Docks & Charging Station */}
+      {/* Docks & charging bay */}
       <g fill="var(--map-dock)" stroke="var(--border-tactical)" strokeWidth="1">
-        <rect x="40" y="525" width="160" height="36" rx="3" />
-        <text x="120" y="547" textAnchor="middle" fill="var(--map-dock-text)" fontSize="8.5" fontWeight="700" fontFamily="var(--font-mono)">
-          DOCK-WEST [OUTBOUND]
-        </text>
-
-        <rect x="800" y="525" width="160" height="36" rx="3" />
-        <text x="880" y="547" textAnchor="middle" fill="var(--map-dock-text)" fontSize="8.5" fontWeight="700" fontFamily="var(--font-mono)">
-          DOCK-EAST [INBOUND]
-        </text>
-
-        <rect x="420" y="525" width="160" height="36" rx="3" />
-        <text x="500" y="547" textAnchor="middle" fill="var(--status-active)" fontSize="8.5" fontWeight="700" fontFamily="var(--font-mono)">
-          CHARGING BAY [3 SLOTS]
-        </text>
+        {bays.map((n) => (
+          <rect key={n.id} x={n.x - 70} y={n.y - 16} width="140" height="32" rx="3" />
+        ))}
       </g>
-
-      {/* Robot Planned Trajectories with Dynamic Flow Animation */}
-      {r1 && (
-        <polyline
-          points={activePath(r1.path)}
-          fill="none"
-          stroke={r1.color}
-          strokeWidth="2.5"
-          className="animated-flow-path"
-          opacity="0.85"
-        />
-      )}
-      {r2 && (
-        <polyline
-          points={activePath(r2.path)}
-          fill="none"
-          stroke={r2.color}
-          strokeWidth="2.5"
-          className="animated-flow-path"
-          opacity="0.85"
-        />
-      )}
-      {r3 && (
-        <polyline
-          points={activePath(r3.path)}
-          fill="none"
-          stroke={r3.color}
-          strokeWidth="2.5"
-          className="animated-flow-path"
-          opacity="0.85"
-        />
-      )}
-
-      {/* =========================================================================
-         CORRIDOR C-14 CHOKEPOINT & EXPLICIT SAFETY HOLD LINES
-         ========================================================================= */}
-
-      {/* North Hold Line for AMR-02 */}
-      <g>
-        <rect x="460" y="174" width="80" height="8" fill="url(#hazard-stripes)" rx="1" />
-        <rect x="460" y="174" width="80" height="8" fill="none" stroke="var(--map-hold-line)" strokeWidth="1" />
-        <text x="500" y="168" textAnchor="middle" fill="var(--map-hold-line)" fontSize="8" fontWeight="800" fontFamily="var(--font-mono)">
-          HOLD LINE N-14 (WAIT HERE IF C-14 LEASED)
-        </text>
-      </g>
-
-      {/* West Hold Line for AMR-01 */}
-      <g>
-        <rect x="406" y="235" width="8" height="70" fill="url(#hazard-stripes)" rx="1" />
-        <rect x="406" y="235" width="8" height="70" fill="none" stroke="var(--map-hold-line)" strokeWidth="1" />
-        <text
-          x="398"
-          y="273"
-          textAnchor="end"
-          fill="var(--map-hold-line)"
-          fontSize="8"
-          fontWeight="800"
-          fontFamily="var(--font-mono)"
-        >
-          HOLD LINE W-14
-        </text>
-      </g>
-
-      {/* Corridor C-14 Central Mutual Exclusion Box (Solar Dusk Theme) */}
-      <g>
-        <rect
-          x="445"
-          y="225"
-          width="110"
-          height="90"
-          rx="6"
-          fill={reservation ? "var(--status-active-tint)" : "var(--bg-surface)"}
-          stroke={reservation ? "var(--status-active)" : "var(--border-tactical)"}
-          strokeWidth={reservation ? "2" : "1.5"}
-        />
-
-        {/* Pulse ring when leased */}
-        {reservation && (
-          <circle cx="500" cy="270" r="42" fill="none" stroke="var(--status-active)" className="animate-pulse-ring" strokeWidth="1.5" />
-        )}
-
-        <text
-          x="500"
-          y="250"
-          textAnchor="middle"
-          fill="var(--text-primary)"
-          fontSize="11"
-          fontWeight="800"
-          fontFamily="var(--font-mono)"
-        >
-          CORRIDOR C-14
-        </text>
-
-        <text
-          x="500"
-          y="266"
-          textAnchor="middle"
-          fill="var(--text-muted)"
-          fontSize="8"
-          fontWeight="700"
-          fontFamily="var(--font-mono)"
-        >
-          MUTEX SINGLE-LANE
-        </text>
-
-        <rect
-          x="465"
-          y="276"
-          width="70"
-          height="16"
-          rx="3"
-          fill={reservation ? "var(--status-active)" : "var(--bg-elevated)"}
-          stroke={reservation ? "var(--status-active)" : "var(--border-tactical)"}
-          strokeWidth="1"
-        />
-        <text
-          x="500"
-          y="288"
-          textAnchor="middle"
-          fill={reservation ? "var(--primary-foreground)" : "var(--text-secondary)"}
-          fontSize="8.5"
-          fontWeight="800"
-          fontFamily="var(--font-mono)"
-        >
-          {reservation ? `🔒 ${reservation}` : "OPEN // IDLE"}
-        </text>
-      </g>
-
-      {/* Injected Blockage at Aisle B-07 with Expanding Alert Pulse */}
-      {aisleBlocked && (
-        <g>
-          {/* Shaded obstacle zone over Aisle B-07 */}
-          <rect x="610" y="400" width="60" height="30" fill="rgba(239, 68, 68, 0.2)" stroke="#EF4444" strokeWidth="1.5" strokeDasharray="3 3" rx="4" />
-          <circle cx="640" cy="415" r="22" fill="none" stroke="#EF4444" className="animate-pulse-ring" />
-          <circle
-            cx="640"
-            cy="415"
-            r="18"
-            fill="var(--bg-surface)"
-            stroke="#EF4444"
-            strokeWidth="2"
-          />
-          <path d="M 632 407 L 648 423 M 648 407 L 632 423" stroke="#EF4444" strokeWidth="2.5" strokeLinecap="round" />
-          <rect x="570" y="437" width="140" height="15" rx="3" fill="var(--bg-surface)" stroke="#EF4444" strokeWidth="0.8" />
-          <text
-            x="640"
-            y="448"
-            textAnchor="middle"
-            fill="#EF4444"
-            fontSize="8"
-            fontWeight="800"
-            fontFamily="var(--font-mono)"
-          >
-            AISLE B-07 BLOCKED
+      <g stroke="none" fontSize="8.5" fontWeight="800" fontFamily="var(--font-mono)" textAnchor="middle">
+        {bays.map((n) => (
+          <text key={n.id} x={n.x} y={n.y + 3} fill={n.type === "charge" ? "var(--status-active)" : "var(--map-dock-text)"}>
+            {n.label}
           </text>
-        </g>
-      )}
+        ))}
+      </g>
 
-      {/* Active AMR Markers (Clickable for Telemetry HUD Inspection) */}
+      {/* Junctions / waypoints */}
+      <g>
+        {yard.map((n) => {
+          const isZone = world.mutex_zones.includes(n.id);
+          const hold = /hold/i.test(n.label);
+          return (
+            <g key={n.id}>
+              <circle cx={n.x} cy={n.y} r={isZone ? 0 : 4.5} fill="var(--bg-surface)" stroke="var(--map-lane)" strokeWidth="1.2">
+                <title>{n.label}</title>
+              </circle>
+              {hold && (
+                <text x={n.x} y={n.y - 9} textAnchor="middle" fill="var(--map-hold-line)" fontSize="7.5" fontWeight="800" fontFamily="var(--font-mono)">
+                  {n.label.replace(/\s*\(.*\)/, "")} HOLD
+                </text>
+              )}
+            </g>
+          );
+        })}
+      </g>
+
+      {/* Mutex zones: box, hazard-striped hold lines on every approach, live lease holder */}
+      {zones.map((zone) => {
+        const holder = leases[zone.id];
+        const approaches = world.edges
+          .filter(([a, b]) => a === zone.id || b === zone.id)
+          .map(([a, b]) => nodes.get(a === zone.id ? b : a))
+          .filter((n): n is WorldNode => Boolean(n));
+        return (
+          <g key={zone.id}>
+            {approaches.map((n) => {
+              const dx = n.x - zone.x;
+              const dy = n.y - zone.y;
+              const len = Math.hypot(dx, dy) || 1;
+              const hx = zone.x + (dx / len) * 62;
+              const hy = zone.y + (dy / len) * 62;
+              const angle = (Math.atan2(dy, dx) * 180) / Math.PI;
+              return (
+                <g key={n.id} transform={`translate(${hx} ${hy}) rotate(${angle})`}>
+                  <rect x="-4" y="-32" width="8" height="64" fill="url(#hazard-stripes)" rx="1" />
+                  <rect x="-4" y="-32" width="8" height="64" fill="none" stroke="var(--map-hold-line)" strokeWidth="1" />
+                </g>
+              );
+            })}
+            <rect
+              x={zone.x - 55}
+              y={zone.y - 45}
+              width="110"
+              height="90"
+              rx="6"
+              fill={holder ? "var(--status-active-tint)" : "var(--bg-surface)"}
+              stroke={holder ? "var(--status-active)" : "var(--border-tactical)"}
+              strokeWidth={holder ? 2 : 1.5}
+            />
+            {holder && <circle cx={zone.x} cy={zone.y} r="42" fill="none" stroke="var(--status-active)" className="animate-pulse-ring" strokeWidth="1.5" />}
+            <text x={zone.x} y={zone.y - 20} textAnchor="middle" fill="var(--text-primary)" fontSize="11" fontWeight="800" fontFamily="var(--font-mono)">
+              {zone.label}
+            </text>
+            <text x={zone.x} y={zone.y - 4} textAnchor="middle" fill="var(--text-muted)" fontSize="8" fontWeight="700" fontFamily="var(--font-mono)">
+              MUTEX SINGLE-LANE
+            </text>
+            <rect
+              x={zone.x - 35}
+              y={zone.y + 6}
+              width="70"
+              height="16"
+              rx="3"
+              fill={holder ? "var(--status-active)" : "var(--bg-elevated)"}
+              stroke={holder ? "var(--status-active)" : "var(--border-tactical)"}
+            />
+            <text x={zone.x} y={zone.y + 18} textAnchor="middle" fill={holder ? "var(--primary-foreground)" : "var(--text-secondary)"} fontSize="8.5" fontWeight="800" fontFamily="var(--font-mono)">
+              {holder ? `[HOLD: ${holder}]` : "OPEN // IDLE"}
+            </text>
+          </g>
+        );
+      })}
+
+      {/* Planned trajectories: current position -> remaining waypoints */}
+      {robots.map((r) => {
+        const remaining = [r.position, ...r.path.slice(r.path_index + 1)];
+        return remaining.length > 1 ? (
+          <polyline key={`path-${r.id}`} points={polyline(remaining)} fill="none" stroke={r.color} strokeWidth="2.5" className="animated-flow-path" opacity="0.85" />
+        ) : null;
+      })}
+
+      {/* Real inter-robot packets (latest exchanges only) */}
+      {beams.map((m) => {
+        const a = byId.get(m.sender)!;
+        const b = byId.get(m.recipient)!;
+        return (
+          <line
+            key={m.id}
+            x1={a.position.x}
+            y1={a.position.y}
+            x2={b.position.x}
+            y2={b.position.y}
+            stroke={BEAM_COLORS[m.type] ?? "#A855F7"}
+            strokeWidth="1.6"
+            strokeDasharray="4 4"
+            className="animated-flow-path"
+            opacity="0.65"
+            style={{ pointerEvents: "none" }}
+          />
+        );
+      })}
+
+      {/* Blocked nodes reported by the backend */}
+      {blockedNodes.map((id) => {
+        const n = nodes.get(id);
+        if (!n) return null;
+        return (
+          <g key={id}>
+            <rect x={n.x - 30} y={n.y - 15} width="60" height="30" fill="rgba(239, 68, 68, 0.2)" stroke="#EF4444" strokeWidth="1.5" strokeDasharray="3 3" rx="4" />
+            <circle cx={n.x} cy={n.y} r="22" fill="none" stroke="#EF4444" className="animate-pulse-ring" />
+            <circle cx={n.x} cy={n.y} r="18" fill="var(--bg-surface)" stroke="#EF4444" strokeWidth="2" />
+            <path d={`M ${n.x - 8} ${n.y - 8} L ${n.x + 8} ${n.y + 8} M ${n.x + 8} ${n.y - 8} L ${n.x - 8} ${n.y + 8}`} stroke="#EF4444" strokeWidth="2.5" strokeLinecap="round" />
+            <rect x={n.x - 75} y={n.y + 22} width="150" height="15" rx="3" fill="var(--bg-surface)" stroke="#EF4444" strokeWidth="0.8" />
+            <text x={n.x} y={n.y + 33} textAnchor="middle" fill="#EF4444" fontSize="8" fontWeight="800" fontFamily="var(--font-mono)">
+              {n.label.replace(/\s*\[.*\]/, "").toUpperCase()} BLOCKED
+            </text>
+          </g>
+        );
+      })}
+
+      {/* AMRs (click to inspect) */}
       {robots.map((robot) => (
-        <g
-          key={robot.id}
-          onClick={() => onSelectRobot && onSelectRobot(robot)}
-          style={{ cursor: "pointer" }}
-        >
-          <title>{`Click to inspect ${robot.id} (${robot.name}) Telemetry HUD`}</title>
+        <g key={robot.id} onClick={() => onSelectRobot?.(robot)} style={{ cursor: "pointer" }}>
+          <title>{`Click to inspect ${robot.id} (${robot.name}) telemetry`}</title>
           <RobotMarker robot={robot} />
         </g>
       ))}

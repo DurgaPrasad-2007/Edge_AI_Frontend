@@ -1,5 +1,6 @@
 import type { RobotId, RobotState } from "@/lib/fleet-contract";
-import { Battery, ShieldCheck, ChevronRight, Activity } from "lucide-react";
+import { Battery, ShieldCheck, ChevronRight } from "lucide-react";
+import { useFleetSocket } from "@/lib/use-fleet-socket";
 
 interface TelemetryPanelProps {
   robots: RobotState[];
@@ -14,14 +15,17 @@ export function TelemetryPanel({
   selectedRobotId,
   onSelectRobot,
 }: TelemetryPanelProps) {
+  const { world, fleetState } = useFleetSocket();
+  const zone = world?.nodes.find((n) => n.id === world.mutex_zones[0]);
+  const zoneName = zone?.label ?? "Mutex zone";
   const leaseHolder = robots.find((r) => r.id === reservation);
 
   return (
     <div className="simulator-sidebar">
-      {/* 1. Conflict Cell C-14 Lease State */}
+      {/* 1. Mutex zone lease state */}
       <div className="sidebar-panel">
         <div className="sidebar-panel-title">
-          <span>Corridor Mutex (C-14)</span>
+          <span>Mutex Zone ({zoneName})</span>
           <span className={`badge ${reservation ? "badge-danger" : "badge-nominal"}`}>
             {reservation ? "LEASED" : "OPEN"}
           </span>
@@ -46,18 +50,18 @@ export function TelemetryPanel({
           </div>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <span style={{ fontSize: 11, color: "var(--text-muted)", textTransform: "uppercase" }}>
-              Arbiter Policy
+              Arbiter Score
             </span>
             <span className="font-mono" style={{ fontSize: 11, color: "var(--text-secondary)" }}>
-              Safety &gt; Priority &gt; Battery
+              priority + 0.2 × (100 − battery)
             </span>
           </div>
         </div>
 
         <p style={{ fontSize: 12, color: "var(--text-secondary)", lineHeight: 1.5, margin: 0 }}>
           {reservation
-            ? `${leaseHolder?.name} holds the exclusive single-lane space-time lease. Neighboring AMRs yield at waypoint WP-04/09 until exit.`
-            : "Intersection is unoccupied. Approaching AMRs broadcast spatial intent over peer mesh to acquire a bounded traversal lease."}
+            ? `${leaseHolder?.name ?? reservation} holds the exclusive single-lane lease. Other AMRs wait at the hold points until it exits.`
+            : "Zone is unoccupied. The next AMR to reach it is granted the lease; simultaneous arrivals are ranked by the score above."}
         </p>
       </div>
 
@@ -169,11 +173,12 @@ export function TelemetryPanel({
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <ShieldCheck className="w-4 h-4" style={{ color: "var(--solar-terracotta)" }} />
           <span style={{ fontSize: 12, fontWeight: 700, color: "var(--text-primary)" }}>
-            ISO 3691-4:2023 Safety
+            Separation Monitor
           </span>
         </div>
         <p style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 4, lineHeight: 1.4, margin: 0 }}>
-          0.5m dynamic personnel envelope active. Zero-motion observer API cannot override onboard emergency stop loops.
+          {fleetState?.collision_count ?? 0} proximity violations recorded
+          {world ? ` (threshold ${world.config.collision_radius} map units)` : ""}. This dashboard only observes; it never issues motion commands.
         </p>
       </div>
     </div>

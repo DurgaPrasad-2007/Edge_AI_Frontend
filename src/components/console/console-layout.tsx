@@ -14,6 +14,7 @@ import { useAuth } from "@/components/auth-provider";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { useFleetSocket, type KPIMetrics, type ConnectionMode } from "@/lib/use-fleet-socket";
 import { playClick } from "@/lib/sound-effects";
+import { GlobalActivityTray } from "@/components/console/global-activity-tray";
 
 // ── Icons (inline SVG for zero-dep) ──────────────────────────────────────
 
@@ -61,25 +62,26 @@ const IconWifiOff = () => (
   </svg>
 );
 
-// ── Streamlined Nav items (Compressed to 4 cohesive hubs) ────────────────────
+// ── Console navigation ───────────────────────────────────────────────────────
 
 const NAV_ITEMS = [
   { href: "/console", label: "Mission Control", icon: IconControl, matches: ["/console", "/console/map"] },
   { href: "/console/workers", label: "Fleet & Tasks", icon: IconFleet, matches: ["/console/workers", "/console/jobs"] },
   { href: "/console/telemetry", label: "Network & Comms", icon: IconComms, matches: ["/console/telemetry", "/console/comms"] },
-  { href: "/console/settings", label: "Settings & Audit", icon: IconSettings, matches: ["/console/settings", "/console/audit", "/console/analytics"] },
+  { href: "/console/analytics", label: "Insights & Audit", icon: IconAnalytics, matches: ["/console/analytics", "/console/audit"] },
+  { href: "/console/settings", label: "Settings", icon: IconSettings, matches: ["/console/settings"] },
 ];
 
 // ── KPI Ticker ────────────────────────────────────────────────────────────
 
-function KPITicker({ kpis, mode, robots }: { kpis: KPIMetrics; mode: ConnectionMode; robots: Array<{ status: string; battery: number; id: string }> }) {
+function KPITicker({ kpis, mode, robots }: { kpis: KPIMetrics; mode: ConnectionMode; robots: Array<{ status: string; battery: number; id: string; task_id?: string | null }> }) {
   const [tick, setTick] = useState(0);
   useEffect(() => {
     const t = setInterval(() => setTick((n) => n + 1), 1000);
     return () => clearInterval(t);
   }, []);
 
-  const activeRobots = robots.filter((r) => r.status === "Moving" || r.status === "Task handoff" || r.status === "Rerouting").length;
+  const activeRobots = robots.filter((r) => r.task_id).length;
 
   return (
     <div className="console-kpi-bar">
@@ -90,13 +92,13 @@ function KPITicker({ kpis, mode, robots }: { kpis: KPIMetrics; mode: ConnectionM
 
       <div className="kpi-metrics-row">
         <KPIChip label="FLEET UTIL" value={`${kpis.fleetUtilizationPct}%`} color="cyan" pulse={kpis.fleetUtilizationPct > 50} />
-        <KPIChip label="ACTIVE AMRs" value={`${activeRobots}/${robots.length}`} color="green" />
+        <KPIChip label="ON MISSION" value={`${activeRobots}/${robots.length}`} color="green" />
         <KPIChip label="AVG BATTERY" value={`${kpis.avgBatteryPct}%`} color={kpis.avgBatteryPct < 30 ? "amber" : "green"} />
         <KPIChip label="TASKS/HR" value={`${kpis.tasksPerHour}`} color="cyan" />
         <KPIChip label="COMPLETED" value={`${kpis.completedTotal}`} color="green" />
         <KPIChip label="COLLISIONS" value={`${kpis.collisionCount}`} color={kpis.collisionCount > 0 ? "red" : "green"} />
-        <KPIChip label="C-14 LEASES" value={`${kpis.activeLeases}`} color="amber" />
-        <KPIChip label="MESH HEALTH" value={`${kpis.meshHealthPct}%`} color={kpis.meshHealthPct > 80 ? "green" : "amber"} />
+        <KPIChip label="LEASES" value={`${kpis.activeLeases}`} color="amber" />
+        <KPIChip label="FLEET HEALTH" value={`${kpis.meshHealthPct}%`} color={kpis.meshHealthPct > 80 ? "green" : "amber"} />
         <KPIChip label="TICK" value={`${kpis.tick}`} color="default" mono />
       </div>
 
@@ -107,7 +109,7 @@ function KPITicker({ kpis, mode, robots }: { kpis: KPIMetrics; mode: ConnectionM
         </Link>
         <div className={`kpi-conn-badge kpi-conn-${mode}`}>
           {mode === "live" ? <IconWifi /> : <IconWifiOff />}
-          <span>{mode === "live" ? "LIVE" : "OFFLINE SIM"}</span>
+          <span>{mode === "live" ? "LIVE" : "OFFLINE"}</span>
         </div>
         <ClientClock />
       </div>
@@ -145,11 +147,15 @@ export function ConsoleLayout({ children }: { children: React.ReactNode }) {
   const { user, session, signOut } = useAuth();
   const { kpis, robots, connectionMode } = useFleetSocket(session?.access_token);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  void user;
 
   return (
     <div className="console-shell" onMouseLeave={() => setSidebarOpen(false)}>
       {/* ── Top KPI Bar ── */}
       <KPITicker kpis={kpis} mode={connectionMode} robots={robots} />
+
+      {/* ── Global Activity Tray (persistent across all panels) ── */}
+      <GlobalActivityTray />
 
       <div className="console-body">
         {/* ── Sidebar ── */}

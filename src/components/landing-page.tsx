@@ -1,9 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import type { RobotState } from "@/lib/fleet-contract";
 import { useFleetSocket } from "@/lib/use-fleet-socket";
-import { useAuth } from "@/components/auth-provider";
 import { Navbar } from "@/components/navbar";
 import { Footer } from "@/components/footer";
 import { CookieBanner } from "@/components/cookie-banner";
@@ -22,22 +21,33 @@ import { EventStream } from "@/components/digital-twin/event-stream";
 import { RagSearch } from "@/components/digital-twin/rag-search";
 import { LiveTelemetryChart } from "@/components/digital-twin/live-telemetry-chart";
 import { RobotHudModal } from "@/components/digital-twin/robot-hud-modal";
-import { DemoPresenterGuide } from "@/components/digital-twin/demo-presenter-guide";
+import { DemoPresenterGuide, type DemoScenario } from "@/components/digital-twin/demo-presenter-guide";
 import { CommandPalette } from "@/components/ui/command-palette";
+import { FleetStatusBanner } from "@/components/fleet-status-banner";
 import { playClick, playWarning, playLeaseAcquired, playChirp, playRadarPing } from "@/lib/sound-effects";
 
 export function LandingPage() {
-  const auth = useAuth();
   const {
     fleetState,
+    world,
     robots,
+    tasks,
     events,
+    p2pMessages,
     isConnected,
     sendControl,
     injectBlockage,
     requestReservation,
     publishIntent,
-  } = useFleetSocket(auth.session?.access_token);
+    createTask,
+    setRobotBattery,
+    simulateAgentDropout,
+  } = useFleetSocket();
+
+  // Scenario buttons act on whatever the backend actually has: its first mutex zone, its aisle node and its robots.
+  const zoneId = world?.mutex_zones[0] ?? "C-14";
+  const aisleId = world?.nodes.find((n) => /aisle/i.test(n.id))?.id ?? world?.nodes.find((n) => n.type === "transit")?.id ?? "B-07";
+  const [first, second] = robots;
 
   const apiStatus = isConnected ? "online" : "offline";
   const [showUserModal, setShowUserModal] = useState(false);
@@ -45,6 +55,25 @@ export function LandingPage() {
   const [showRadar, setShowRadar] = useState(true);
   const [showHeatmap, setShowHeatmap] = useState(false);
   const [showCmdPalette, setShowCmdPalette] = useState(false);
+  const autoStartedRef = useRef(false);
+
+  // Auto-seed a demonstration mission if fleet is completely idle on initial connection
+  useEffect(() => {
+    if (!isConnected || autoStartedRef.current || !world) return;
+    const activeTasks = tasks.filter((t) => t.status !== "Completed");
+    if (activeTasks.length === 0) {
+      autoStartedRef.current = true;
+      void sendControl("start");
+      void createTask({
+        pickup: "DOCK-W",
+        destination: "DOCK-E",
+        priority: 85,
+        payload_kg: 220,
+        payload_size: "medium",
+        urgency: "standard",
+      });
+    }
+  }, [isConnected, world, tasks, sendControl, createTask]);
 
   // Keep inspected robot in sync with live real telemetry
   useEffect(() => {
@@ -68,11 +97,10 @@ export function LandingPage() {
   const handleInjectBlockage = () => {
     if (fleetState?.aisle_blocked) {
       playChirp();
-      void sendControl("reset");
     } else {
       playWarning();
-      void injectBlockage("B-07");
     }
+    void injectBlockage(aisleId);
   };
 
   const handleToggleRadar = () => {
@@ -80,20 +108,38 @@ export function LandingPage() {
     setShowRadar(!showRadar);
   };
 
-  const handleTriggerScenario = async (scenario: "mutex" | "obstacle" | "offline") => {
+  const handleTriggerScenario = async (scenario: DemoScenario) => {
+    await sendControl("start");
     if (scenario === "mutex") {
       playLeaseAcquired();
-      await sendControl("start");
-      await requestReservation("AMR-01", "C-14", 4.8);
-      await publishIntent("AMR-02", "C-14", 3.2);
+      // Dispatch two opposing missions converging on Corridor C-14 to physically demonstrate arbitration & yielding
+      await createTask({ pickup: "DOCK-W", destination: "DOCK-E", priority: 95, payload_kg: 250, payload_size: "medium", urgency: "critical" });
+      await createTask({ pickup: "DOCK-E", destination: "DOCK-W", priority: 65, payload_kg: 180, payload_size: "medium", urgency: "standard" });
     } else if (scenario === "obstacle") {
       playWarning();
-      await sendControl("start");
-      await injectBlockage("B-07");
-    } else if (scenario === "offline") {
+      // Block Aisle B-07 and dispatch a transit job that forces A* perimeter detour
+      if (!fleetState?.aisle_blocked) {
+        await injectBlockage(aisleId);
+      }
+      await createTask({ pickup: "BYPASS-W", destination: "BYPASS-E", priority: 80, payload_kg: 160, payload_size: "small", urgency: "standard" });
+    } else if (scenario === "auction") {
+      // Contract-Net demo: dispatch a real task between rack and dock, triggering multi-AMR bidding
       playChirp();
-      await sendControl("start");
-      await publishIntent("AMR-01", "C-14", 6.4);
+      await createTask({ pickup: "RACK A-02", destination: "DOCK-E", priority: 90, payload_kg: 320, payload_size: "heavy", urgency: "critical" });
+    } else if (scenario === "dropout") {
+      // Agent Dropout & Lease Expiry demo: simulate radio blackout on an AMR
+      playWarning();
+      const targetRobot = robots.find((r) => r.status !== "Blocked") ?? robots[1] ?? robots[0];
+      if (targetRobot) {
+        await simulateAgentDropout(targetRobot.id);
+      }
+    } else if (scenario === "battery") {
+      // Low Battery & Opportunity Charging demo: drop battery to 22% (<30% threshold)
+      playChirp();
+      const targetRobot = robots.find((r) => r.status !== "Charging" && r.leg !== "to_charge") ?? robots[1] ?? robots[0];
+      if (targetRobot) {
+        await setRobotBattery(targetRobot.id, 22.0);
+      }
     }
   };
 
@@ -146,6 +192,8 @@ export function LandingPage() {
             onTriggerScenario={handleTriggerScenario}
           />
 
+          <FleetStatusBanner />
+
           <div className="simulator-container">
             {/* Map Canvas & Toolbar */}
             <div className="simulator-map-wrap">
@@ -163,12 +211,16 @@ export function LandingPage() {
                   playClick();
                   setShowHeatmap(!showHeatmap);
                 }}
+                aisleLabel={world?.nodes.find((n) => n.id === aisleId)?.label}
+                disabled={!isConnected}
               />
 
               <WarehouseMap
+                world={world}
                 robots={robots}
-                reservation={fleetState?.reservation ?? null}
-                aisleBlocked={Boolean(fleetState?.aisle_blocked)}
+                leases={fleetState?.leases ?? {}}
+                blockedNodes={fleetState?.blocked_nodes ?? []}
+                p2p={p2pMessages}
                 showRadar={showRadar}
                 showHeatmap={showHeatmap}
                 onSelectRobot={(r) => {
@@ -193,8 +245,10 @@ export function LandingPage() {
                   paddingTop: 8,
                 }}
               >
-                <span>Control cycle: 600ms deterministic tick &middot; ROS 2 / Zenoh peer packets: {fleetState?.messages ?? 0}</span>
-                <span>ISO 3691-4 Principles: 0.5m dynamic lateral clearance</span>
+                <span>
+                  Control cycle: {world ? Math.round(world.config.control_period_s * 1000) : "—"}ms tick &middot; peer packets exchanged: {fleetState?.messages ?? 0}
+                </span>
+                <span>Collisions: {fleetState?.collision_count ?? 0} &middot; queued tasks: {fleetState?.kpis.queued_tasks ?? 0}</span>
               </div>
             </div>
 

@@ -8,79 +8,147 @@
  * - P2P message rate sparkline
  */
 
-import { useState, useEffect, useRef } from "react";
-import { useAuth } from "@/components/auth-provider";
+import { useState } from "react";
 import { useFleetSocket, type RobotState } from "@/lib/use-fleet-socket";
+import { FleetStatusBanner } from "@/components/fleet-status-banner";
 import { CommsPanel } from "@/components/console/comms-panel";
-
-const AMR_COLORS: Record<string, string> = {
-  "AMR-01": "#C2541A",
-  "AMR-02": "#F59E0B",
-  "AMR-03": "#38BDF8",
-};
+import { Activity, Radio } from "lucide-react";
 
 // ── SVG Sparkline ─────────────────────────────────────────────────────────
 
 function Sparkline({
-  data, color, width = 300, height = 60, label, unit, showGrid = true,
+  data,
+  color,
+  width = 300,
+  height = 70,
+  label,
+  unit,
+  fixedMin = 0,
+  fixedMax,
 }: {
-  data: number[]; color: string; width?: number; height?: number;
-  label?: string; unit?: string; showGrid?: boolean;
+  data: number[];
+  color: string;
+  width?: number;
+  height?: number;
+  label?: string;
+  unit?: string;
+  fixedMin?: number;
+  fixedMax?: number;
 }) {
-  if (data.length < 2) {
-    return <div className="chart-empty">Awaiting data…</div>;
-  }
-  const min = Math.min(...data, 0);
-  const max = Math.max(...data, 1);
+  const safeData = data && data.length > 0 ? data : [0];
+  const renderedData = safeData.length === 1 ? [safeData[0], safeData[0]] : safeData;
+
+  const dataMin = Math.min(...renderedData);
+  const dataMax = Math.max(...renderedData);
+
+  const min = fixedMin !== undefined ? fixedMin : Math.min(dataMin, 0);
+  const max = fixedMax !== undefined ? fixedMax : Math.max(dataMax, 1);
   const range = max - min || 1;
-  const pts = data.map((v, i) => {
-    const x = (i / (data.length - 1)) * width;
-    const y = height - ((v - min) / range) * (height - 8);
-    return `${x},${y}`;
+
+  const topPad = 14;
+  const bottomPad = 14;
+  const plotH = height - topPad - bottomPad;
+
+  const pts = renderedData.map((v, i) => {
+    const x = (i / (renderedData.length - 1)) * width;
+    const y = topPad + plotH - ((v - min) / range) * plotH;
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
   });
-  const areaPath = `M ${pts.join(" L ")} L ${width},${height} L 0,${height} Z`;
+
+  const areaPath = `M 0,${height - bottomPad} L ${pts.join(" L ")} L ${width},${height - bottomPad} Z`;
   const linePath = `M ${pts.join(" L ")}`;
-  const latest = data[data.length - 1];
+  const latest = renderedData[renderedData.length - 1];
+  const lastX = width;
+  const lastY = topPad + plotH - ((latest - min) / range) * plotH;
+
+  const gradId = `grad-${color.replace(/[^a-zA-Z0-9]/g, "")}`;
 
   return (
-    <svg viewBox={`0 0 ${width} ${height + 20}`} className="chart-svg" preserveAspectRatio="none">
-      <defs>
-        <linearGradient id={`grad-${color.replace("#", "")}`} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={color} stopOpacity="0.3" />
-          <stop offset="100%" stopColor={color} stopOpacity="0.02" />
-        </linearGradient>
-      </defs>
-      {showGrid && [0.25, 0.5, 0.75].map((f) => (
-        <line key={f} x1="0" y1={height * (1 - f)} x2={width} y2={height * (1 - f)}
-          stroke="rgba(255,255,255,0.04)" strokeWidth="1" />
-      ))}
-      <path d={areaPath} fill={`url(#grad-${color.replace("#", "")})`} />
-      <path d={linePath} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-      {/* Latest value dot */}
-      <circle cx={width} cy={height - ((latest - min) / range) * (height - 8)} r="3.5" fill={color} />
-      {/* Labels */}
-      {label && <text x="4" y="12" fill="rgba(148,163,184,0.5)" fontSize="8" fontFamily="var(--font-mono)">{label}</text>}
-      {unit && (
-        <text x={width - 4} y="12" textAnchor="end" fill={color} fontSize="9" fontFamily="var(--font-mono)" fontWeight="600">
-          {Math.round(latest * 10) / 10}{unit}
-        </text>
-      )}
-      {/* Y-axis labels */}
-      <text x="2" y={height - 2} fill="rgba(148,163,184,0.35)" fontSize="7" fontFamily="var(--font-mono)">{Math.round(min)}</text>
-      <text x="2" y="22" fill="rgba(148,163,184,0.35)" fontSize="7" fontFamily="var(--font-mono)">{Math.round(max)}</text>
-    </svg>
+    <div className="tele-sparkline-wrapper" style={{ width: "100%", position: "relative" }}>
+      <svg
+        viewBox={`0 0 ${width} ${height}`}
+        className="chart-svg"
+        preserveAspectRatio="none"
+        style={{ width: "100%", height: `${height}px`, display: "block" }}
+      >
+        <defs>
+          <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={color} stopOpacity="0.28" />
+            <stop offset="100%" stopColor={color} stopOpacity="0.02" />
+          </linearGradient>
+        </defs>
+
+        {/* Subtle grid lines */}
+        <line x1="0" y1={topPad} x2={width} y2={topPad} stroke="var(--border-subtle)" strokeWidth="0.8" strokeDasharray="3 3" />
+        <line x1="0" y1={topPad + plotH / 2} x2={width} y2={topPad + plotH / 2} stroke="var(--border-subtle)" strokeWidth="0.8" strokeDasharray="3 3" />
+        <line x1="0" y1={height - bottomPad} x2={width} y2={height - bottomPad} stroke="var(--border-subtle)" strokeWidth="1" />
+
+        {/* Shaded Area and Stroke Line */}
+        <path d={areaPath} fill={`url(#${gradId})`} />
+        <path d={linePath} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+
+        {/* Pulse endpoint circle */}
+        <circle cx={lastX} cy={lastY} r="3.5" fill={color} />
+        <circle cx={lastX} cy={lastY} r="6" fill="none" stroke={color} strokeWidth="1" opacity="0.4" />
+      </svg>
+
+      {/* HTML overlay labels so fonts never distort or stretch across aspect ratios */}
+      <div
+        style={{
+          position: "absolute",
+          top: 2,
+          left: 4,
+          right: 4,
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          pointerEvents: "none",
+          fontFamily: "var(--font-mono)",
+          fontSize: "10px",
+        }}
+      >
+        <span style={{ color: "var(--text-muted)", fontSize: "9px", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+          {label ?? ""}
+        </span>
+        <span style={{ color, fontWeight: 700 }}>
+          {Math.round(latest * 10) / 10}{unit ?? ""}
+        </span>
+      </div>
+
+      <div
+        style={{
+          position: "absolute",
+          bottom: 0,
+          left: 4,
+          right: 4,
+          display: "flex",
+          justifyContent: "space-between",
+          pointerEvents: "none",
+          fontFamily: "var(--font-mono)",
+          fontSize: "8.5px",
+          color: "var(--text-muted)",
+        }}
+      >
+        <span>{Math.round(min)}</span>
+        <span>{Math.round(max)}</span>
+      </div>
+    </div>
   );
 }
 
 // ── Battery trend chart ───────────────────────────────────────────────────
 
-function BatteryTrendChart({ history }: { history: Record<string, number[]> }) {
+function BatteryTrendChart({ history, robots }: { history: Record<string, number[]>; robots: RobotState[] }) {
+  const colors = Object.fromEntries(robots.map((r) => [r.id, r.color])) as Record<string, string>;
   return (
     <div className="tele-chart-card">
       <div className="tele-chart-header">
-        <span className="tele-chart-title">Battery Trend (60-tick)</span>
+        <div className="flex flex-col">
+          <span className="tele-chart-title">Battery Level Dynamics</span>
+          <span className="tele-chart-sub">Real-time state of charge (%) · 60-tick rolling window</span>
+        </div>
         <div className="tele-legend">
-          {Object.entries(AMR_COLORS).map(([id, color]) => (
+          {Object.entries(colors).map(([id, color]) => (
             <span key={id} className="tele-legend-item">
               <span style={{ background: color, width: 8, height: 8, borderRadius: 2, display: "inline-block", marginRight: 4 }} />
               {id}
@@ -89,10 +157,20 @@ function BatteryTrendChart({ history }: { history: Record<string, number[]> }) {
         </div>
       </div>
       <div className="tele-multi-chart">
-        {Object.entries(AMR_COLORS).map(([id, color]) => (
+        {Object.entries(colors).map(([id, color]) => (
           <div key={id} className="tele-sub-chart">
             <span className="tele-sub-label" style={{ color }}>{id}</span>
-            <Sparkline data={history[id] ?? [100]} color={color} width={280} height={50} unit="%" />
+            <div className="flex-1">
+              <Sparkline
+                data={history[id] ?? [0]}
+                color={color}
+                width={380}
+                height={64}
+                unit="%"
+                fixedMin={0}
+                fixedMax={100}
+              />
+            </div>
           </div>
         ))}
       </div>
@@ -106,74 +184,102 @@ function MessageRateChart({ msgHistory }: { msgHistory: number[] }) {
   return (
     <div className="tele-chart-card">
       <div className="tele-chart-header">
-        <span className="tele-chart-title">P2P Message Rate</span>
-        <span className="tele-chart-sub">Zenoh DDS mesh packets/tick</span>
+        <div className="flex flex-col">
+          <span className="tele-chart-title">P2P Mesh Network Traffic</span>
+          <span className="tele-chart-sub">Auction bids, lease grants, yields and heartbeats exchanged between AMRs</span>
+        </div>
       </div>
-      <Sparkline data={msgHistory} color="#A855F7" width={600} height={80} label="MSG RATE" unit=" msgs" />
+      <Sparkline
+        data={msgHistory}
+        color="#A855F7"
+        width={500}
+        height={88}
+        label="PEER PACKETS / TICK"
+        unit=" msgs"
+        fixedMin={0}
+      />
     </div>
   );
 }
 
 // ── Lease timeline ────────────────────────────────────────────────────────
 
-function LeaseTimeline({ leaseHistory }: { leaseHistory: Array<{ tick: number; holder: string | null }> }) {
-  const recent = leaseHistory.slice(-60);
-  const w = 600;
-  const h = 40;
+function LeaseTimeline({ holders, zone, colorOf, robots }: { holders: (string | null)[]; zone: string; colorOf: (id: string) => string; robots: RobotState[] }) {
+  const recent = holders.slice(-60).map((holder) => ({ holder }));
+  const w = 500;
+  const h = 32;
   const blockW = w / Math.max(1, recent.length);
 
   return (
     <div className="tele-chart-card">
       <div className="tele-chart-header">
-        <span className="tele-chart-title">Corridor C-14 Lease Timeline</span>
-        <span className="tele-chart-sub">Space-time micro-lease occupancy (last 60 ticks)</span>
+        <div className="flex flex-col">
+          <span className="tele-chart-title">{zone} Lease Timeline</span>
+          <span className="tele-chart-sub">Single-lane mutex space-time reservation sequence (last 60 ticks)</span>
+        </div>
       </div>
-      <svg viewBox={`0 0 ${w} ${h + 24}`} className="chart-svg" style={{ width: "100%", height: "auto" }}>
-        {/* Base track */}
-        <rect x="0" y="8" width={w} height={h} fill="rgba(6,182,212,0.05)" rx="4" />
-        {/* Lease segments */}
-        {recent.map((entry, i) => {
-          if (!entry.holder) return null;
-          const color = AMR_COLORS[entry.holder] ?? "#06B6D4";
-          return (
-            <rect key={i} x={i * blockW} y="8" width={blockW} height={h}
-              fill={color} fillOpacity="0.7" />
-          );
-        })}
+
+      <div style={{ position: "relative", width: "100%", overflow: "hidden" }}>
+        <svg viewBox={`0 0 ${w} ${h}`} className="chart-svg" style={{ width: "100%", height: `${h}px`, borderRadius: "4px" }}>
+          {/* Base track */}
+          <rect x="0" y="0" width={w} height={h} fill="var(--bg-elevated)" rx="4" />
+
+          {/* Lease segments */}
+          {recent.map((entry, i) => {
+            if (!entry.holder) return null;
+            const color = colorOf(entry.holder);
+            return (
+              <rect
+                key={i}
+                x={i * blockW}
+                y="0"
+                width={Math.max(1, blockW)}
+                height={h}
+                fill={color}
+                opacity="0.85"
+              />
+            );
+          })}
+        </svg>
+
         {/* Legend */}
-        {Object.entries(AMR_COLORS).map(([id, color], i) => (
-          <g key={id} transform={`translate(${i * 100}, ${h + 16})`}>
-            <rect width="10" height="10" fill={color} rx="2" />
-            <text x="14" y="9" fill="rgba(148,163,184,0.6)" fontSize="8" fontFamily="var(--font-mono)">{id}</text>
-          </g>
-        ))}
-        <g transform={`translate(310, ${h + 16})`}>
-          <rect width="10" height="10" fill="rgba(6,182,212,0.05)" stroke="rgba(6,182,212,0.3)" strokeWidth="1" rx="2" />
-          <text x="14" y="9" fill="rgba(148,163,184,0.6)" fontSize="8" fontFamily="var(--font-mono)">Free</text>
-        </g>
-      </svg>
+        <div className="flex items-center gap-4 mt-3 font-mono text-[9px] text-[var(--text-muted)]">
+          {robots.map((r) => (
+            <div key={r.id} className="flex items-center gap-1.5">
+              <span style={{ background: r.color, width: 8, height: 8, borderRadius: 2 }} />
+              <span>{r.id}</span>
+            </div>
+          ))}
+          <div className="flex items-center gap-1.5">
+            <span style={{ border: "1px dashed var(--border-tactical)", width: 8, height: 8, borderRadius: 2, background: "var(--bg-elevated)" }} />
+            <span>Idle / Free</span>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
 
 // ── Throughput bar chart ──────────────────────────────────────────────────
 
-function ThroughputChart({ completedByRobot }: { completedByRobot: Record<string, number> }) {
+function ThroughputChart({ completedByRobot, colorOf }: { completedByRobot: Record<string, number>; colorOf: (id: string) => string }) {
   const maxVal = Math.max(1, ...Object.values(completedByRobot));
 
   return (
     <div className="tele-chart-card">
       <div className="tele-chart-header">
-        <span className="tele-chart-title">Task Completion by AMR</span>
-        <span className="tele-chart-sub">Total tasks completed this session</span>
+        <div className="flex flex-col">
+          <span className="tele-chart-title">Fleet Task Completion By AMR</span>
+          <span className="tele-chart-sub">Missions each AMR has delivered since the floor was last reset</span>
+        </div>
       </div>
       <div className="tele-bar-chart">
         {Object.entries(completedByRobot).map(([id, count]) => {
-          const color = AMR_COLORS[id] ?? "#06B6D4";
-          const pct = (count / maxVal) * 100;
+          const color = colorOf(id);
+          const pct = Math.max(4, (count / maxVal) * 100);
           return (
             <div key={id} className="tele-bar-row">
-              <span className="tele-bar-label" style={{ color }}>{id}</span>
+              <span className="tele-bar-label" style={{ color, fontWeight: 700 }}>{id}</span>
               <div className="tele-bar-track">
                 <div className="tele-bar-fill" style={{ width: `${pct}%`, background: color }} />
               </div>
@@ -189,46 +295,9 @@ function ThroughputChart({ completedByRobot }: { completedByRobot: Record<string
 // ── Main TelemetryPanel ───────────────────────────────────────────────────
 
 export function TelemetryPanel() {
-  const { session } = useAuth();
-  const { robots, fleetState } = useFleetSocket(session?.access_token);
-
-  const batteryHistory = useRef<Record<string, number[]>>({
-    "AMR-01": [], "AMR-02": [], "AMR-03": [],
-  });
-  const msgHistory = useRef<number[]>([]);
-  const leaseHistory = useRef<Array<{ tick: number; holder: string | null }>>([]);
-  const prevMessages = useRef(0);
-
-  const [, forceRender] = useState(0);
-
-  useEffect(() => {
-    if (!fleetState) return;
-
-    // Record battery per robot
-    for (const r of fleetState.robots) {
-      const hist = batteryHistory.current[r.id] ?? [];
-      hist.push(r.battery);
-      if (hist.length > 60) hist.shift();
-      batteryHistory.current[r.id] = hist;
-    }
-
-    // Record message delta
-    const delta = fleetState.messages - prevMessages.current;
-    prevMessages.current = fleetState.messages;
-    msgHistory.current.push(Math.max(0, delta));
-    if (msgHistory.current.length > 60) msgHistory.current.shift();
-
-    // Lease history
-    leaseHistory.current.push({ tick: fleetState.tick, holder: fleetState.reservation });
-    if (leaseHistory.current.length > 120) leaseHistory.current.shift();
-
-    forceRender((n) => n + 1);
-  }, [fleetState]);
-
-  // Completed by robot (from events — best effort)
-  const completedByRobot = Object.fromEntries(
-    robots.map((r) => [r.id, r.completed])
-  );
+  const { robots, fleetState, world, history, robotColor } = useFleetSocket();
+  const zone = world?.mutex_zones[0] ?? "Corridor";
+  const completedByRobot = Object.fromEntries(robots.map((r) => [r.id, r.completed]));
 
   const [activeTab, setActiveTab] = useState<"charts" | "comms">("charts");
 
@@ -237,7 +306,7 @@ export function TelemetryPanel() {
       <div className="panel-header">
         <div className="panel-title-group">
           <h1 className="panel-title">Network & Comms</h1>
-          <span className="panel-subtitle">Real-time telemetry streams · Zenoh DDS peer mesh monitor</span>
+          <span className="panel-subtitle">Real-time telemetry streams · inter-robot packet monitor</span>
         </div>
         <div className="panel-header-badges">
           <div className="filter-tabs" style={{ marginBottom: 0 }}>
@@ -245,13 +314,15 @@ export function TelemetryPanel() {
               className={`filter-tab${activeTab === "charts" ? " filter-tab-active" : ""}`}
               onClick={() => setActiveTab("charts")}
             >
-              📊 Metrics & Charts
+              <Activity className="w-3.5 h-3.5 inline mr-1.5" />
+              Metrics & Charts
             </button>
             <button
               className={`filter-tab${activeTab === "comms" ? " filter-tab-active" : ""}`}
               onClick={() => setActiveTab("comms")}
             >
-              📡 Zenoh Mesh Log
+              <Radio className="w-3.5 h-3.5 inline mr-1.5" />
+              Packet &amp; Event Log
             </button>
           </div>
           <span className="badge badge-mono">TICK {fleetState?.tick ?? 0}</span>
@@ -259,15 +330,17 @@ export function TelemetryPanel() {
         </div>
       </div>
 
+      <FleetStatusBanner />
+
       {activeTab === "comms" ? (
         <CommsPanel />
       ) : (
         <>
           <div className="tele-charts-grid">
-            <BatteryTrendChart history={batteryHistory.current} />
-            <ThroughputChart completedByRobot={completedByRobot} />
-            <MessageRateChart msgHistory={msgHistory.current.length ? msgHistory.current : [0]} />
-            <LeaseTimeline leaseHistory={leaseHistory.current.length ? leaseHistory.current : [{ tick: 0, holder: null }]} />
+            <BatteryTrendChart history={history.battery} robots={robots} />
+            <ThroughputChart completedByRobot={completedByRobot} colorOf={robotColor} />
+            <MessageRateChart msgHistory={history.messageRate.length ? history.messageRate : [0]} />
+            <LeaseTimeline holders={history.leaseHolder} zone={zone} colorOf={robotColor} robots={robots} />
           </div>
 
           {/* Metrics summary table */}
@@ -283,7 +356,7 @@ export function TelemetryPanel() {
               <tbody>
                 {robots.map((r) => (
                   <tr key={r.id}>
-                    <td style={{ color: AMR_COLORS[r.id], fontFamily: "var(--font-mono)" }}>{r.id}</td>
+                    <td style={{ color: r.color, fontFamily: "var(--font-mono)" }}>{r.id}</td>
                     <td>{r.name}</td>
                     <td><span className={`status-chip status-${r.status.toLowerCase().replace(" ", "-")}`}>{r.status}</span></td>
                     <td style={{ fontFamily: "var(--font-mono)", color: r.battery < 30 ? "#EF4444" : "#10B981" }}>

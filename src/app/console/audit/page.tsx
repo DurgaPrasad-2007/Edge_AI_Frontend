@@ -1,4 +1,2 @@
-import { redirect } from "next/navigation";
-export default function AuditPage() {
-  redirect("/console/settings");
-}
+import { AnalyticsPanel } from "@/components/console/analytics-panel";
+export default function AuditPage() { return <AnalyticsPanel initialTab="audit" />; }

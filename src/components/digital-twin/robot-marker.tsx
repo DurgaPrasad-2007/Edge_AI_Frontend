@@ -77,7 +77,7 @@ export function RobotMarker({ robot }: { robot: RobotState }) {
             fontWeight="800"
             fontFamily="var(--font-mono)"
           >
-            🛑 OBSTACLE STOP
+            [STOPPED // NO ROUTE]
           </text>
         </g>
       )}
@@ -103,7 +103,7 @@ export function RobotMarker({ robot }: { robot: RobotState }) {
             fontWeight="800"
             fontFamily="var(--font-mono)"
           >
-            ⏳ YIELDING
+            [HOLD // YIELDING]
           </text>
         </g>
       )}
@@ -129,7 +129,7 @@ export function RobotMarker({ robot }: { robot: RobotState }) {
             fontWeight="800"
             fontFamily="var(--font-mono)"
           >
-            🔄 D* RE-ROUTE
+            [A* RE-ROUTE]
           </text>
         </g>
       )}

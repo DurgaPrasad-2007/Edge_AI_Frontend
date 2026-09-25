@@ -6,17 +6,24 @@
  */
 
 import { useState } from "react";
-import { useAuth } from "@/components/auth-provider";
+import {
+  Activity,
+  BatteryCharging,
+  Package,
+  CheckCircle2,
+  Clock,
+  ShieldCheck,
+  ShieldAlert,
+  Lock,
+  Radio,
+  LayoutDashboard,
+  Map,
+  BarChart3,
+  AlertTriangle,
+  Play,
+} from "lucide-react";
 import { useFleetSocket, type RobotState, type FleetEvent } from "@/lib/use-fleet-socket";
 import { MapPanel } from "@/components/console/map-panel";
-
-// ── Robot color map ───────────────────────────────────────────────────────
-
-const AMR_COLORS: Record<string, string> = {
-  "AMR-01": "#C2541A",
-  "AMR-02": "#F59E0B",
-  "AMR-03": "#38BDF8",
-};
 
 const STATUS_COLORS: Record<string, string> = {
   Moving: "#10B981",
@@ -61,7 +68,7 @@ function BatteryDonut({ pct, color }: { pct: number; color: string }) {
 // ── Robot card ────────────────────────────────────────────────────────────
 
 function RobotCard({ robot }: { robot: RobotState }) {
-  const color = AMR_COLORS[robot.id] ?? "#06B6D4";
+  const color = robot.color;
   const statusColor = STATUS_COLORS[robot.status] ?? "#64748B";
   const isActive = ["Moving", "Task handoff", "Rerouting"].includes(robot.status);
 
@@ -107,17 +114,41 @@ function RobotCard({ robot }: { robot: RobotState }) {
   );
 }
 
-// ── KPI Big Card ──────────────────────────────────────────────────────────
+// ── KPI Card (Clean Industrial High-Density Layout) ──────────────────────────
 
-function BigKPI({ label, value, sub, color, icon }: { label: string; value: string; sub?: string; color: string; icon: string }) {
+interface BigKPIProps {
+  label: string;
+  value: string | number;
+  unit?: string;
+  sub?: string;
+  icon: React.ReactNode;
+  iconColor?: string;
+  valueColor?: string;
+}
+
+function BigKPI({ label, value, unit, sub, icon, iconColor, valueColor }: BigKPIProps) {
   return (
-    <div className="ov-kpi-card" style={{ "--kpi-color": color } as React.CSSProperties}>
-      <div className="ov-kpi-icon">{icon}</div>
-      <div className="ov-kpi-content">
+    <div className="ov-kpi-card">
+      <div className="ov-kpi-top">
         <span className="ov-kpi-label">{label}</span>
-        <span className="ov-kpi-value" style={{ color }}>{value}</span>
-        {sub && <span className="ov-kpi-sub">{sub}</span>}
+        <div
+          className="ov-kpi-icon-badge"
+          style={{
+            color: iconColor ?? "var(--text-secondary)",
+            background: iconColor ? `${iconColor}15` : "var(--bg-elevated)",
+            borderColor: iconColor ? `${iconColor}35` : "var(--border-subtle)",
+          }}
+        >
+          {icon}
+        </div>
       </div>
+      <div className="ov-kpi-value-row">
+        <span className="ov-kpi-value" style={valueColor ? { color: valueColor } : undefined}>
+          {value}
+        </span>
+        {unit && <span className="ov-kpi-unit">{unit}</span>}
+      </div>
+      {sub && <span className="ov-kpi-sub">{sub}</span>}
     </div>
   );
 }
@@ -138,13 +169,13 @@ function EventItem({ ev }: { ev: FleetEvent }) {
 // ── Main ─────────────────────────────────────────────────────────────────
 
 export function OverviewPanel() {
-  const { session } = useAuth();
-  const { fleetState, robots, events, kpis, tasks, connectionMode } = useFleetSocket(session?.access_token);
+  const { fleetState, robots, events, kpis, connectionMode, world } = useFleetSocket();
+  const zoneId = world?.mutex_zones[0] ?? "Mutex zone";
+  const zoneHolder = fleetState?.leases[zoneId] ?? null;
+  const blockedLabels = (fleetState?.blocked_nodes ?? []).map((id) => world?.nodes.find((n) => n.id === id)?.label ?? id);
   const [viewMode, setViewMode] = useState<"hub" | "map" | "kpi">("hub");
 
   const activeRobots = robots.filter((r) => ["Moving", "Task handoff", "Rerouting"].includes(r.status));
-  const pendingTasks = tasks.filter((t) => t.status === "Queued" || t.status === "Assigned").length;
-  const completedTasks = tasks.filter((t) => t.status === "Completed").length;
 
   return (
     <div className="console-panel ov-panel">
@@ -160,47 +191,104 @@ export function OverviewPanel() {
               className={`filter-tab${viewMode === "hub" ? " filter-tab-active" : ""}`}
               onClick={() => setViewMode("hub")}
             >
-              ⊞ Control Hub
+              <LayoutDashboard className="w-3.5 h-3.5 inline mr-1.5" />
+              Control Hub
             </button>
             <button
               className={`filter-tab${viewMode === "map" ? " filter-tab-active" : ""}`}
               onClick={() => setViewMode("map")}
             >
-              🗺 Full Map
+              <Map className="w-3.5 h-3.5 inline mr-1.5" />
+              Full Map
             </button>
             <button
               className={`filter-tab${viewMode === "kpi" ? " filter-tab-active" : ""}`}
               onClick={() => setViewMode("kpi")}
             >
-              📊 KPI Grid
+              <BarChart3 className="w-3.5 h-3.5 inline mr-1.5" />
+              KPI Grid
             </button>
           </div>
           <span className={`badge badge-${connectionMode === "live" ? "live" : "sim"}`}>
-            {connectionMode === "live" ? "● LIVE" : "◎ SIMULATION"}
+            {connectionMode === "live" ? "● LIVE" : "○ OFFLINE"}
           </span>
-          {fleetState?.running && <span className="badge badge-running">▶ RUNNING</span>}
-          {fleetState?.aisle_blocked && <span className="badge badge-warn">⚠ B-07 BLOCKED</span>}
+          {fleetState?.running && (
+            <span className="badge badge-running inline-flex items-center gap-1">
+              <Play className="w-2.5 h-2.5 fill-current" /> RUNNING
+            </span>
+          )}
+          {fleetState?.aisle_blocked && (
+            <span className="badge badge-warn inline-flex items-center gap-1">
+              <AlertTriangle className="w-2.5 h-2.5" /> {blockedLabels.join(", ").toUpperCase()} BLOCKED
+            </span>
+          )}
         </div>
       </div>
 
       {/* ── KPI Cards ── */}
       <div className="ov-kpi-grid">
-        <BigKPI label="FLEET UTILIZATION" value={`${kpis.fleetUtilizationPct}%`}
-          sub={`${activeRobots.length} of ${robots.length} AMRs active`} color="#06B6D4" icon="⚡" />
-        <BigKPI label="AVG BATTERY" value={`${kpis.avgBatteryPct}%`}
-          sub="across fleet" color={kpis.avgBatteryPct < 30 ? "#EF4444" : "#10B981"} icon="🔋" />
-        <BigKPI label="TASKS/HR" value={`${kpis.tasksPerHour}`}
-          sub="throughput estimate" color="#A855F7" icon="📦" />
-        <BigKPI label="COMPLETED" value={`${kpis.completedTotal}`}
-          sub={`+${completedTasks} this session`} color="#10B981" icon="✓" />
-        <BigKPI label="PENDING TASKS" value={`${pendingTasks}`}
-          sub="in queue" color="#F59E0B" icon="⏳" />
-        <BigKPI label="COLLISIONS" value={`${kpis.collisionCount}`}
-          sub="ISO 3691-4 safe" color={kpis.collisionCount > 0 ? "#EF4444" : "#10B981"} icon="🛡" />
-        <BigKPI label="C-14 LEASES" value={`${kpis.activeLeases}`}
-          sub={fleetState?.reservation ? `held by ${fleetState.reservation}` : "corridor free"} color="#F59E0B" icon="🔒" />
-        <BigKPI label="MESH HEALTH" value={`${kpis.meshHealthPct}%`}
-          sub="P2P peer links" color={kpis.meshHealthPct > 80 ? "#10B981" : "#F59E0B"} icon="📡" />
+        <BigKPI
+          label="Fleet Utilization"
+          value={kpis.fleetUtilizationPct}
+          unit="%"
+          sub={`${robots.filter((r) => r.task_id).length} of ${robots.length} AMRs on a mission`}
+          icon={<Activity />}
+          iconColor="var(--solar-terracotta)"
+        />
+        <BigKPI
+          label="Avg Battery"
+          value={kpis.avgBatteryPct}
+          unit="%"
+          sub="across all AMRs"
+          icon={<BatteryCharging />}
+          iconColor={kpis.avgBatteryPct < 30 ? "#EF4444" : "#10B981"}
+          valueColor={kpis.avgBatteryPct < 30 ? "#EF4444" : undefined}
+        />
+        <BigKPI
+          label="Tasks / Hour"
+          value={kpis.tasksPerHour}
+          sub="since the floor was reset"
+          icon={<Package />}
+          iconColor="var(--solar-terracotta)"
+        />
+        <BigKPI
+          label="Completed"
+          value={kpis.completedTotal}
+          sub="all-time, from the database"
+          icon={<CheckCircle2 />}
+          iconColor="#10B981"
+        />
+        <BigKPI
+          label="Pending Queue"
+          value={kpis.queuedTasks}
+          sub="queued or blocked, awaiting a robot"
+          icon={<Clock />}
+          iconColor={kpis.queuedTasks > 0 ? "var(--solar-terracotta)" : "var(--text-tertiary)"}
+        />
+        <BigKPI
+          label="Collisions"
+          value={kpis.collisionCount}
+          sub={kpis.collisionCount > 0 ? "proximity violations recorded" : "no proximity violations"}
+          icon={kpis.collisionCount > 0 ? <ShieldAlert /> : <ShieldCheck />}
+          iconColor={kpis.collisionCount > 0 ? "#EF4444" : "#10B981"}
+          valueColor={kpis.collisionCount > 0 ? "#EF4444" : undefined}
+        />
+        <BigKPI
+          label={`${zoneId} Mutex`}
+          value={zoneHolder ?? "OPEN"}
+          sub={zoneHolder ? "lease held" : "corridor free"}
+          icon={<Lock />}
+          iconColor={zoneHolder ? "var(--solar-terracotta)" : "#10B981"}
+          valueColor={zoneHolder ? "var(--solar-terracotta)" : "#10B981"}
+        />
+        <BigKPI
+          label="Fleet Health"
+          value={kpis.meshHealthPct}
+          unit="%"
+          sub="AMRs operational (not blocked, battery > 10%)"
+          icon={<Radio />}
+          iconColor={kpis.meshHealthPct > 80 ? "#10B981" : "#F59E0B"}
+        />
       </div>
 
       {/* ── Embedded Map Section ── */}
@@ -211,7 +299,7 @@ export function OverviewPanel() {
       ) : viewMode === "hub" ? (
         <div style={{ marginBottom: "20px" }}>
           <div className="ov-section-title" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <span>Live Digital Twin · Corridor C-14 Mutex & AMR Positions</span>
+            <span>Live Digital Twin · {zoneId} Mutex & AMR Positions</span>
             <button className="filter-tab" onClick={() => setViewMode("map")} style={{ fontSize: "10px", padding: "2px 8px" }}>
               Expand Full Map ↗
             </button>
@@ -235,11 +323,11 @@ export function OverviewPanel() {
       </div>
 
       {/* ── Event Feed ── */}
-      <div className="ov-section-title">P2P Event Feed</div>
+      <div className="ov-section-title">Fleet Event Feed</div>
       <div className="ov-event-feed">
         {events.length === 0
           ? <div className="ov-empty">Awaiting fleet events…</div>
-          : events.slice(0, 12).map((ev, i) => <EventItem key={i} ev={ev} />)}
+          : events.slice(0, 12).map((ev, i) => <EventItem key={ev.id ?? i} ev={ev} />)}
       </div>
     </div>
   );

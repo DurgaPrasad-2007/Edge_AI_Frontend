@@ -5,27 +5,29 @@
  * Full event stream from backend WebSocket with type filtering
  */
 
-import { useState, useRef, useEffect } from "react";
-import { useAuth } from "@/components/auth-provider";
+import { useState, useRef, useEffect, ReactNode } from "react";
 import { useFleetSocket, type FleetEvent } from "@/lib/use-fleet-socket";
+import { Lock, Radio, CornerDownRight, CheckCircle2, Activity } from "lucide-react";
 
-const EVENT_META: Record<string, { color: string; icon: string; desc: string }> = {
-  LEASE: { color: "#06B6D4", icon: "🔒", desc: "Corridor space-time micro-lease grant/release" },
-  INTENT: { color: "#A855F7", icon: "📡", desc: "Robot trajectory intent broadcast (peer mesh)" },
-  REROUTE: { color: "#F59E0B", icon: "🔀", desc: "Dynamic reroute triggered by blockage/conflict" },
-  HANDOFF: { color: "#10B981", icon: "🤝", desc: "Contract-Net task handoff / bid winner" },
-  HEARTBEAT: { color: "#64748B", icon: "💓", desc: "Peer quorum heartbeat / mesh health check" },
+const EVENT_META: Record<string, { color: string; icon: ReactNode; desc: string }> = {
+  LEASE: { color: "#06B6D4", icon: <Lock className="w-3.5 h-3.5" />, desc: "Corridor space-time micro-lease grant/release" },
+  INTENT: { color: "#A855F7", icon: <Radio className="w-3.5 h-3.5" />, desc: "Robot trajectory intent broadcast" },
+  REROUTE: { color: "#F59E0B", icon: <CornerDownRight className="w-3.5 h-3.5" />, desc: "Dynamic reroute triggered by blockage/conflict" },
+  HANDOFF: { color: "#10B981", icon: <CheckCircle2 className="w-3.5 h-3.5" />, desc: "Contract-Net task handoff / bid winner" },
+  HEARTBEAT: { color: "#64748B", icon: <Activity className="w-3.5 h-3.5" />, desc: "Simulation state changes and task lifecycle" },
 };
 
 const ALL_TYPES = ["LEASE", "INTENT", "REROUTE", "HANDOFF", "HEARTBEAT"] as const;
 type EventType = (typeof ALL_TYPES)[number];
 
 function EventRow({ ev, index }: { ev: FleetEvent; index: number }) {
-  const meta = EVENT_META[ev.type] ?? { color: "#64748B", icon: "●", desc: "" };
+  const meta = EVENT_META[ev.type] ?? { color: "#64748B", icon: <Activity className="w-3.5 h-3.5" />, desc: "" };
   return (
     <div className={`comms-event-row${index % 2 === 0 ? " comms-event-alt" : ""}`}
       style={{ animationDelay: `${index * 20}ms` }}>
-      <span className="comms-event-icon">{meta.icon}</span>
+      <span className="comms-event-icon" style={{ color: meta.color, display: "inline-flex", alignItems: "center" }}>
+        {meta.icon}
+      </span>
       <span className="comms-event-time">{ev.time}</span>
       <span className="comms-event-type" style={{ color: meta.color, borderColor: `${meta.color}40` }}>
         {ev.type}
@@ -36,8 +38,7 @@ function EventRow({ ev, index }: { ev: FleetEvent; index: number }) {
 }
 
 export function CommsPanel() {
-  const { session } = useAuth();
-  const { events, fleetState } = useFleetSocket(session?.access_token);
+  const { events, fleetState, robots, p2pMessages } = useFleetSocket();
   const [filter, setFilter] = useState<EventType | "ALL">("ALL");
   const [search, setSearch] = useState("");
   const [autoScroll, setAutoScroll] = useState(true);
@@ -60,7 +61,7 @@ export function CommsPanel() {
       <div className="panel-header">
         <div className="panel-title-group">
           <h1 className="panel-title">P2P Comms Log</h1>
-          <span className="panel-subtitle">Zenoh DDS Peer-to-Peer Message Stream · Real-time</span>
+          <span className="panel-subtitle">Fleet events and inter-robot packets · real-time</span>
         </div>
         <div className="comms-controls">
           <input
@@ -115,16 +116,16 @@ export function CommsPanel() {
         <div className="comms-log-header">
           <span>EVENT LOG · {filtered.length} messages</span>
           <span className="comms-log-stats">
-            Tick {fleetState?.tick ?? 0} · {fleetState?.messages ?? 0} total P2P msgs
+            Tick {fleetState?.tick ?? 0} · {fleetState?.messages ?? 0} total peer packets
           </span>
         </div>
         <div className="comms-log-body">
           {filtered.length === 0 ? (
             <div className="comms-empty">
-              {search ? "No messages match your search." : "Start simulation to see P2P events…"}
+              {search ? "No messages match your search." : "No events yet — run the simulation or dispatch a task."}
             </div>
           ) : (
-            filtered.map((ev, i) => <EventRow key={i} ev={ev} index={i} />)
+            filtered.map((ev, i) => <EventRow key={ev.id ?? i} ev={ev} index={i} />)
           )}
           <div ref={logEndRef} />
         </div>
@@ -132,20 +133,17 @@ export function CommsPanel() {
 
       {/* Mesh health indicator */}
       <div className="comms-mesh-bar">
-        <div className="mesh-bar-item">
-          <span className="mesh-dot mesh-dot-green" />
-          <span>AMR-01 Atlas · Direct Link</span>
-        </div>
-        <div className="mesh-bar-item">
-          <span className="mesh-dot mesh-dot-amber" />
-          <span>AMR-02 Nova · Direct Link</span>
-        </div>
-        <div className="mesh-bar-item">
-          <span className="mesh-dot mesh-dot-cyan" />
-          <span>AMR-03 Kite · Direct Link</span>
-        </div>
+        {robots.map((r) => (
+          <div key={r.id} className="mesh-bar-item">
+            <span
+              className={`mesh-dot ${r.status === "Blocked" || r.battery <= 10 ? "mesh-dot-amber" : "mesh-dot-green"}`}
+              title={r.status}
+            />
+            <span>{r.id} {r.name} · {r.status}</span>
+          </div>
+        ))}
         <div className="mesh-bar-divider" />
-        <span className="mesh-protocol">rmw_zenoh · No Central Broker · Peer Discovery Active</span>
+        <span className="mesh-protocol">{p2pMessages.length} recent packets · {robots.length} AMRs registered</span>
       </div>
     </div>
   );

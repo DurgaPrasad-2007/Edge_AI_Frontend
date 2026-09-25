@@ -25,18 +25,19 @@ export function EventStream({ events }: { events: FleetEvent[] }) {
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <Radio className="w-4 h-4" style={{ color: "var(--solar-terracotta)" }} />
           <strong style={{ fontSize: 13, color: "var(--text-primary)" }}>
-            Replicated Peer Intent &amp; Lease Stream
+            Fleet Event Stream
           </strong>
         </div>
         <span className="badge badge-active" style={{ fontSize: 10 }}>
-          ROS 2 / ZENOH DDS MESH
+          LIVE FROM COORDINATOR
         </span>
       </div>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 8, maxHeight: 180, overflowY: "auto" }}>
+        {events.length === 0 && <div style={{ color: "var(--text-muted)", fontSize: 12 }}>No events yet.</div>}
         {events.slice(0, 6).map((evt, idx) => (
           <div
-            key={`${evt.time}-${idx}`}
+            key={evt.id ?? `${evt.time}-${idx}`}
             style={{
               display: "flex",
               alignItems: "center",

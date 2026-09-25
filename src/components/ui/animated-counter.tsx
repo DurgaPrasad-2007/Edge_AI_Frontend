@@ -11,6 +11,10 @@ interface AnimatedCounterProps {
   className?: string;
 }
 
+/**
+ * Counts up when first scrolled into view, then eases to every new `value`
+ * (so it can show live data, not just a number known at mount).
+ */
 export function AnimatedCounter({
   value,
   duration = 1400,
@@ -20,53 +24,43 @@ export function AnimatedCounter({
   className = "",
 }: AnimatedCounterProps) {
   const [displayValue, setDisplayValue] = useState(0);
+  const [visible, setVisible] = useState(false);
   const elementRef = useRef<HTMLSpanElement | null>(null);
-  const hasAnimated = useRef(false);
+  const shownRef = useRef(0);
+  const firstRun = useRef(true);
 
   useEffect(() => {
     const element = elementRef.current;
     if (!element) return;
-
     const observer = new IntersectionObserver(
-      (entries) => {
-        const [entry] = entries;
-        if (entry.isIntersecting && !hasAnimated.current) {
-          hasAnimated.current = true;
-          startAnimation();
-        }
+      ([entry]) => {
+        if (entry.isIntersecting) setVisible(true);
       },
       { threshold: 0.2 }
     );
-
     observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
 
-    const startAnimation = () => {
-      const startTime = performance.now();
+  useEffect(() => {
+    if (!visible) return;
+    const from = shownRef.current;
+    const span = firstRun.current ? duration : Math.min(duration, 500); // quick catch-up for live updates
+    firstRun.current = false;
+    const startTime = performance.now();
+    let frame = 0;
 
-      const animate = (currentTime: number) => {
-        const elapsed = currentTime - startTime;
-        const progress = Math.min(elapsed / duration, 1);
-
-        // Ease out cubic: 1 - pow(1 - progress, 3)
-        const easeProgress = 1 - Math.pow(1 - progress, 3);
-        const currentVal = easeProgress * value;
-
-        setDisplayValue(currentVal);
-
-        if (progress < 1) {
-          requestAnimationFrame(animate);
-        } else {
-          setDisplayValue(value);
-        }
-      };
-
-      requestAnimationFrame(animate);
+    const animate = (now: number) => {
+      const progress = Math.min((now - startTime) / span, 1);
+      const eased = 1 - Math.pow(1 - progress, 3); // ease-out cubic
+      const current = from + (value - from) * eased;
+      shownRef.current = current;
+      setDisplayValue(current);
+      if (progress < 1) frame = requestAnimationFrame(animate);
     };
-
-    return () => {
-      observer.disconnect();
-    };
-  }, [value, duration]);
+    frame = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(frame);
+  }, [value, duration, visible]);
 
   const formatted = decimals > 0 ? displayValue.toFixed(decimals) : Math.round(displayValue).toString();
 
