@@ -41,26 +41,28 @@ export function EventStream({ events }: { events: FleetEvent[] }) {
             style={{
               display: "flex",
               alignItems: "center",
-              gap: 10,
-              fontSize: 12,
-              padding: "6px 10px",
-              borderRadius: 4,
+              gap: 12,
+              fontSize: 12.5,
+              padding: "7px 12px",
+              borderRadius: 6,
               backgroundColor: "var(--bg-elevated)",
               border: "1px solid var(--border-subtle)",
+              transition: "background-color 0.15s ease",
             }}
           >
-            <span className="mono-metric" style={{ fontSize: 11, color: "var(--text-muted)", minWidth: 55 }}>
+            <span className="mono-metric" style={{ fontSize: 11, fontWeight: 700, color: "var(--text-secondary)", minWidth: 55, letterSpacing: "0.02em" }}>
               {evt.time}
             </span>
-            <span className={`badge ${eventBadgeClass[evt.type]}`} style={{ fontSize: 9.5, padding: "1px 5px" }}>
+            <span className={`badge ${eventBadgeClass[evt.type]}`} style={{ fontSize: 9.5, padding: "2px 6px" }}>
               {evt.type}
             </span>
-            <span style={{ color: "var(--text-secondary)", flex: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+            <span style={{ color: "var(--text-primary)", fontWeight: 500, flex: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
               {evt.message}
             </span>
           </div>
         ))}
       </div>
     </div>
+
   );
 }

@@ -77,24 +77,30 @@ export function RagSearch() {
       </div>
 
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
-        {QUICK_QUERIES.map((chip) => (
-          <button
-            key={chip}
-            type="button"
-            onClick={() => void handleSearch(chip)}
-            className="btn"
-            style={{
-              padding: "4px 10px",
-              fontSize: 11,
-              fontFamily: "var(--font-mono)",
-              backgroundColor: query === chip ? "var(--status-nominal-tint)" : "var(--bg-elevated)",
-              color: query === chip ? "var(--status-nominal)" : "var(--text-secondary)",
-              borderColor: query === chip ? "var(--status-nominal-border)" : "var(--border-tactical)",
-            }}
-          >
-            {chip}
-          </button>
-        ))}
+        {QUICK_QUERIES.map((chip) => {
+          const isActive = query === chip;
+          return (
+            <button
+              key={chip}
+              type="button"
+              onClick={() => void handleSearch(chip)}
+              className="btn"
+              style={{
+                padding: "5px 12px",
+                fontSize: 11.5,
+                fontWeight: isActive ? 700 : 500,
+                fontFamily: "var(--font-mono)",
+                backgroundColor: isActive ? "var(--status-active-tint)" : "var(--bg-elevated)",
+                color: isActive ? "var(--status-active)" : "var(--text-secondary)",
+                border: `1px solid ${isActive ? "var(--status-active)" : "var(--border-tactical)"}`,
+                borderRadius: 5,
+                transition: "all 0.15s ease",
+              }}
+            >
+              {chip}
+            </button>
+          );
+        })}
       </div>
 
       <form
@@ -111,7 +117,7 @@ export function RagSearch() {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search warehouse safety SOPs, obstacle detour policies, battery rules..."
-            style={{ width: "100%", padding: "9px 12px 9px 36px", backgroundColor: "var(--bg-elevated)", border: "1px solid var(--border-tactical)", borderRadius: 6, fontSize: 13, color: "var(--text-primary)" }}
+            style={{ width: "100%", padding: "10px 14px 10px 38px", backgroundColor: "var(--bg-elevated)", border: "1px solid var(--border-tactical)", borderRadius: 6, fontSize: 13, fontWeight: 500, color: "var(--text-primary)" }}
           />
         </div>
         <button type="submit" disabled={loading} className="btn btn-primary" style={{ whiteSpace: "nowrap" }}>
@@ -127,22 +133,32 @@ export function RagSearch() {
 
       <div style={{ display: "grid", gap: 10 }}>
         {results.map((doc, idx) => (
-          <div key={doc.id || idx} style={{ backgroundColor: "var(--bg-elevated)", border: "1px solid var(--border-tactical)", borderRadius: 6, padding: "12px 14px" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                <FileText className="w-3.5 h-3.5 text-blue-600" />
-                <span className="font-mono" style={{ fontSize: 12, fontWeight: 700, color: "var(--status-active)" }}>
+          <div
+            key={doc.id || idx}
+            style={{
+              backgroundColor: "var(--bg-elevated)",
+              border: "1px solid var(--border-subtle)",
+              borderLeft: "3.5px solid var(--solar-terracotta)",
+              borderRadius: 6,
+              padding: "13px 16px",
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+                <FileText className="w-4 h-4 text-blue-600" />
+                <span className="font-mono" style={{ fontSize: 12.5, fontWeight: 800, color: "var(--solar-terracotta)", letterSpacing: "0.02em" }}>
                   {doc.source_name}
                 </span>
               </div>
-              <span className="font-mono" style={{ fontSize: 10.5, color: "var(--text-muted)" }}>
+              <span className="font-mono" style={{ fontSize: 11, fontWeight: 600, color: "var(--text-secondary)" }}>
                 Match #{idx + 1}
                 {typeof doc.similarity === "number" ? ` · Cosine Similarity ${doc.similarity.toFixed(3)}` : ""}
               </span>
             </div>
-            <p style={{ fontSize: 12.5, color: "var(--text-secondary)", lineHeight: 1.5, margin: 0 }}>{doc.content}</p>
+            <p style={{ fontSize: 13, color: "var(--text-primary)", lineHeight: 1.55, margin: 0 }}>{doc.content}</p>
           </div>
         ))}
+
         {!loading && !error && results.length === 0 && (
           <div style={{ color: "var(--text-muted)", fontSize: 12 }}>No matching knowledge chunks.</div>
         )}

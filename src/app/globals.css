@@ -24,38 +24,40 @@
   --ring: oklch(0.56 0.15 49);
   --radius: 0.75rem;
 
-  /* Solar Dusk Light Mode - Sunlit Canvas & Organic Terracotta */
+  /* Solar Dusk Light Mode - Crisp Sunlit Canvas & High-Contrast Terracotta */
   --bg-base: #FAF8F5;
-  --bg-surface: #F5F2EC;
-  --bg-elevated: #ECE5DA;
-  --bg-highlight: #E3D9CC;
-  --bg-muted: #EFE9E0;
+  --bg-surface: #FFFFFF;
+  --bg-elevated: #F6F3EC;
+  --bg-highlight: #ECE6DC;
+  --bg-muted: #EFEBE3;
   --bg-void: #FCFBF9;
-  --border-subtle: #E2DACD;
-  --border-tactical: #D4C9B8;
+  --border-subtle: #E8E1D7;
+  --border-tactical: #D7CCC0;
   --border-focus: #C2541A;
   
-  --text-primary: #38302A;
-  --text-secondary: #6E6359;
-  --text-muted: #94887C;
-  --text-inverse: #FAF8F5;
+  --text-primary: #1C1917;
+  --text-secondary: #44403C;
+  --text-muted: #6B655F;
+  --text-inverse: #FFFFFF;
 
-  --text-display-muted: #94887C;
-  --text-display-emphasis: #28211C;
+  --text-display-muted: #6B655F;
+  --text-display-emphasis: #141210;
+
+  --solar-terracotta: #C2541A;
 
   --neon-cyan: #0284C7;
   --neon-cyan-glow: 0 4px 14px rgba(2, 132, 199, 0.15);
   --neon-cyan-dim: rgba(2, 132, 199, 0.08);
-  --neon-emerald: #16A34A;
-  --neon-emerald-glow: 0 4px 14px rgba(22, 163, 74, 0.15);
+  --neon-emerald: #15803D;
+  --neon-emerald-glow: 0 4px 14px rgba(21, 128, 61, 0.15);
   --neon-amber: #C2541A;
   --neon-amber-glow: 0 4px 14px rgba(194, 84, 26, 0.18);
   --neon-crimson: #DC2626;
   --neon-crimson-glow: 0 4px 14px rgba(220, 38, 38, 0.15);
   --neon-purple: #9333EA;
 
-  --accent-emerald: #16A34A;
-  --accent-emerald-dim: rgba(22, 163, 74, 0.1);
+  --accent-emerald: #15803D;
+  --accent-emerald-dim: rgba(21, 128, 61, 0.1);
   --accent-amber: #C2541A;
   --accent-amber-dim: rgba(194, 84, 26, 0.1);
   --accent-rose: #DC2626;
@@ -63,15 +65,17 @@
   --accent-cobalt: #0284C7;
   --accent-cobalt-dim: rgba(2, 132, 199, 0.1);
 
-  --status-nominal: #16A34A;
-  --status-nominal-tint: #F0FDF4;
-  --status-warning: #C2541A;
-  --status-warning-tint: #FFF7ED;
+  --status-nominal: #15803D;
+  --status-nominal-tint: #DCFCE7;
+  --status-nominal-border: #86EFAC;
+  --status-warning: #C2410C;
+  --status-warning-tint: #FFEDD5;
   --status-active: #C2541A;
   --status-active-tint: #FFEDD5;
   --status-danger: #DC2626;
-  --status-danger-tint: #FEF2F2;
+  --status-danger-tint: #FEE2E2;
   --status-danger-border: #FCA5A5;
+
 
   --shadow-subtle: 0 1px 2px hsl(28 18% 25% / 0.08);
   --shadow-card: 0 2px 6px hsl(28 18% 25% / 0.10), 0 8px 20px hsl(28 18% 25% / 0.06);
@@ -1833,15 +1837,15 @@ p, span, label, input, button, select, textarea {
 }
 
 .badge-nominal {
-  background: var(--bg-elevated);
-  color: var(--text-secondary);
-  border: 1px solid var(--border-tactical);
+  background: var(--status-nominal-tint);
+  color: var(--status-nominal);
+  border: 1px solid var(--status-nominal-border, var(--status-nominal));
 }
 
 .badge-danger {
-  background: var(--status-active-tint);
-  color: var(--status-active);
-  border: 1px solid var(--status-active);
+  background: var(--status-danger-tint);
+  color: var(--status-danger);
+  border: 1px solid var(--status-danger-border, var(--status-danger));
 }
 
 .badge-warning {
@@ -1849,6 +1853,19 @@ p, span, label, input, button, select, textarea {
   color: var(--status-warning);
   border: 1px solid var(--status-warning);
 }
+
+.badge-active {
+  background: var(--status-active-tint);
+  color: var(--status-active);
+  border: 1px solid var(--status-active);
+}
+
+.badge-neutral {
+  background: var(--bg-highlight);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-tactical);
+}
+
 
 .interactive-card {
   transition: border-color 0.2s ease, transform 0.15s ease, box-shadow 0.2s ease;

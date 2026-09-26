@@ -162,16 +162,17 @@ export function MeshConversation({
                   borderBottom: "1px solid var(--border-subtle)",
                 }}
               >
-                <span style={{ color: "var(--text-muted)" }}>{m.timestamp}</span>
+                <span style={{ color: "var(--text-secondary)", fontWeight: 600 }}>{m.timestamp}</span>
                 <span style={{ fontWeight: 700 }}>
                   <span style={{ color: robotColor(m.sender) }}>{m.sender}</span>
-                  <span style={{ color: "var(--text-muted)" }}> → </span>
-                  <span style={{ color: m.recipient === "MESH" ? "var(--text-muted)" : robotColor(m.recipient) }}>
+                  <span style={{ color: "var(--text-secondary)", opacity: 0.7 }}> → </span>
+                  <span style={{ color: m.recipient === "MESH" ? "var(--text-secondary)" : robotColor(m.recipient) }}>
                     {m.recipient === "MESH" ? "everyone" : m.recipient}
                   </span>
                 </span>
-                <span style={{ color: "var(--status-active)" }}>{TYPE_LABEL[m.type] ?? m.type}</span>
-                <span style={{ color: "var(--text-primary)", wordBreak: "break-word" }}>{m.payload}</span>
+                <span style={{ color: "var(--solar-terracotta, var(--status-active))", fontWeight: 700 }}>{TYPE_LABEL[m.type] ?? m.type}</span>
+                <span style={{ color: "var(--text-primary)", fontWeight: 500, wordBreak: "break-word" }}>{m.payload}</span>
+
               </div>
             ))}
           </div>

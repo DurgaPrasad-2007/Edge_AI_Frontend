@@ -58,6 +58,13 @@ export const metadata: Metadata = {
     description: "Decentralized space-time leases & Contract-Net task auctions for autonomous mobile robots in smart facilities.",
     images: ["/images/hero-amr-fleet.jpg"],
   },
+  icons: {
+    icon: [
+      { url: "/favicon.svg", type: "image/svg+xml" },
+    ],
+    shortcut: "/favicon.svg",
+    apple: "/favicon.svg",
+  },
 };
 
 export const viewport: Viewport = {
