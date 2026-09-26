@@ -121,8 +121,8 @@ export function HeroSection({ reservation }: HeroSectionProps) {
       >
         Eliminate single-point-of-failure cloud dispatchers. EdgeFleet deploys lightweight, deterministic peer
         coordination agents directly onto AMR microcomputers. Robots negotiate single-lane corridor leases across a
-        local ROS 2 / Zenoh peer mesh, dynamically detour around blocked aisles, and auction task handoffs with p95 &lt; 150ms
-        decision latency (~84ms observed in testbed) and zero cloud dependency.
+        peer-to-peer message mesh, detour around blocked aisles, and auction task handoffs among themselves. There is no
+        central planner in the loop: every decision is made by a robot from the messages it has heard.
       </p>
 
       {/* Primary CTAs & Developer CLI Quick-Action Bar */}

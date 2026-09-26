@@ -4,14 +4,14 @@ import Link from "next/link";
 const REVIEWER_POINTS = [
   { label: "SIH Challenge ID", val: "Problem Statement 26123 (BEL)", status: "Official" },
   { label: "Submission Scope", val: "Software-first 3-AMR peer mesh evaluation prototype", status: "Verified" },
-  { label: "Coordination Protocol", val: "Decentralized P2P Space-Time Mutex & Contract-Net", status: "Zero SPOF" },
-  { label: "Decision Latency", val: "p95 < 150ms over local LAN (~84ms observed in testbed)", status: "Target Met" },
-  { label: "Chokepoint Mutex", val: "Corridor C-14 deterministic utility leases", status: "0 Deadlocks" },
-  { label: "Dynamic Detour", val: "Aisle B-07 obstacle invalidation & D* Lite graph repair", status: "Real-time" },
-  { label: "Safety Boundary", val: "Engineered to ISO 3691-4 clearance principles (0.5m lateral envelope)", status: "Compliant Design" },
+  { label: "Coordination Protocol", val: "Robot agents on a peer message bus: claims, leases and auctions are decided between robots", status: "No central planner" },
+  { label: "Decision Loop", val: "Each robot decides onboard every 0.6 s control tick; no cloud round-trip", status: "Onboard" },
+  { label: "Chokepoint Mutex", val: "Corridor C-14 leased by claim on the mesh; expires if the holder goes silent", status: "0 Deadlocks (tested)" },
+  { label: "Dynamic Detour", val: "Blockage is broadcast on the mesh; every robot re-plans with A*", status: "Real-time" },
+  { label: "Safety Boundary", val: "Two-node look-ahead reservations + a separation monitor. ISO 3691-4 is a design reference, not a certification", status: "Design reference" },
   { label: "Web API Guarantee", val: "Zero-Motion Observer: console & backend issue no wheel commands", status: "Enforced" },
   { label: "Knowledge Store", val: "PostgreSQL 16 + pgvector (384-d HNSW index for SOP audits)", status: "Audit Only" },
-  { label: "Edge Hardware Target", val: "Raspberry Pi 5 / Jetson Orin (<120MB RAM, <12W SWaP-C)", status: "SWaP-C" },
+  { label: "Edge Hardware Target", val: "Raspberry Pi / Jetson-class onboard compute (design target; the simulation runs on a laptop)", status: "Target" },
 ];
 
 export function ProblemSolution() {
@@ -131,7 +131,7 @@ export function ProblemSolution() {
                 <Check className="w-3 h-3" />
               </span>
               <span>
-                <strong>Target p95 &lt; 150ms Latency:</strong> Direct peer-to-peer V2V intent broadcast over ROS 2 / Zenoh DDS LAN (~84ms observed in testbed) without cloud round-trips.
+                <strong>Peer-to-peer intent broadcast:</strong> every robot publishes its position, claims and intent on the mesh each control tick, with no cloud round-trip.
               </span>
             </li>
             <li style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>

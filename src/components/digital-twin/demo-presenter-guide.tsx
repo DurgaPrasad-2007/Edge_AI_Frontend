@@ -96,59 +96,52 @@ export function DemoPresenterGuide({ aisleBlocked, reservation, robots, onTrigge
         </div>
 
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))", gap: 10, marginBottom: 14 }}>
-          {SCENARIOS.map((sc, i) => (
-            <button
-              key={sc.id}
-              type="button"
-              onClick={() => {
-                sc.sound();
-                setActiveScenario(sc.id);
-                onTriggerScenario(sc.id);
-              }}
-              className={`btn ${activeScenario === sc.id ? "btn-primary" : "btn-secondary"}`}
-              style={{
-                padding: "12px 14px",
-                fontSize: 12,
-                fontWeight: 600,
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "flex-start",
-                justifyContent: "flex-start",
-                gap: 5,
-                textAlign: "left",
-                whiteSpace: "normal",
-                wordBreak: "break-word",
-                overflowWrap: "break-word",
-                width: "100%",
-                minHeight: "92px",
-                boxSizing: "border-box",
-                border: activeScenario === sc.id ? "1px solid var(--status-active)" : "1px solid var(--border-tactical)",
-              }}
-            >
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", gap: 6 }}>
-                <span style={{ fontSize: 11, fontFamily: "var(--font-mono)", fontWeight: 700, letterSpacing: "0.03em" }}>
-                  {sc.icon} SCENARIO {i + 1}
+          {SCENARIOS.map((sc, i) => {
+            const isSelected = activeScenario === sc.id;
+            return (
+              <button
+                key={sc.id}
+                type="button"
+                onClick={() => {
+                  sc.sound();
+                  setActiveScenario(sc.id);
+                  onTriggerScenario(sc.id);
+                }}
+                className={`demo-scenario-card ${isSelected ? "active" : ""}`}
+              >
+                <div className="demo-scenario-card-header">
+                  <span className="demo-scenario-card-chip">
+                    <span>{sc.icon}</span>
+                    <span>SCENARIO {i + 1}</span>
+                  </span>
+                  {isSelected && (
+                    <div className="demo-scenario-active-indicator">
+                      <span className="demo-scenario-active-dot" />
+                      <span>ACTIVE</span>
+                    </div>
+                  )}
+                </div>
+                <strong className="demo-scenario-card-title">
+                  {sc.title}
+                </strong>
+                <span className="demo-scenario-card-blurb">
+                  {sc.blurb}
                 </span>
-                {activeScenario === sc.id && <span className="status-dot active" style={{ flexShrink: 0 }} />}
-              </div>
-              <strong style={{ fontSize: 12.5, fontWeight: 700, lineHeight: 1.3, color: "var(--text-primary)", display: "block", width: "100%" }}>
-                {sc.title}
-              </strong>
-              <span style={{ fontSize: 11, opacity: 0.85, fontWeight: 400, lineHeight: 1.35, color: "var(--text-secondary)", display: "block", width: "100%" }}>
-                {sc.blurb}
-              </span>
-            </button>
-          ))}
+              </button>
+            );
+          })}
         </div>
 
-        <div style={{ background: "var(--bg-surface)", border: "1px solid var(--border-tactical)", borderRadius: 6, padding: "12px 14px", borderLeft: "4px solid var(--status-active)" }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
-            <span style={{ fontSize: 11, fontWeight: 800, color: "var(--status-active)", fontFamily: "var(--font-mono)" }}>WHAT IS HAPPENING RIGHT NOW</span>
-            <span style={{ fontSize: 11, fontFamily: "var(--font-mono)", color: "var(--text-muted)" }}>
+        <div style={{ background: "var(--bg-surface)", border: "1px solid var(--border-tactical)", borderRadius: 8, padding: "12px 16px", borderLeft: "4px solid var(--border-focus)", boxShadow: "var(--shadow-subtle)" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8, flexWrap: "wrap", gap: 8 }}>
+            <span style={{ fontSize: 10.5, fontWeight: 800, color: "var(--status-active)", background: "var(--status-active-tint)", padding: "2px 8px", borderRadius: 4, fontFamily: "var(--font-mono)", letterSpacing: "0.04em", border: "1px solid rgba(194, 84, 26, 0.25)" }}>
+              WHAT IS HAPPENING RIGHT NOW
+            </span>
+            <span style={{ fontSize: 11, fontFamily: "var(--font-mono)", color: reservation ? "var(--accent-emerald)" : "var(--text-muted)", fontWeight: reservation ? 600 : 400 }}>
               {reservation ? `Lease active [${reservation}]` : "No active lease"}
             </span>
           </div>
-          <p style={{ fontSize: 13.5, color: "var(--text-primary)", lineHeight: 1.5, margin: 0, fontWeight: 500 }}>{narration}</p>
+          <p style={{ fontSize: 13, color: "var(--text-primary)", lineHeight: 1.55, margin: 0, fontWeight: 500 }}>{narration}</p>
         </div>
 
         {showCheatSheet && (

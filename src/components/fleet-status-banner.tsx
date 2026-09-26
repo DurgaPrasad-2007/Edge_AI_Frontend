@@ -5,7 +5,7 @@ import { useFleetSocket } from "@/lib/use-fleet-socket";
 
 /** Shows the truth about the backend link: offline, or the reason a command was rejected. */
 export function FleetStatusBanner() {
-  const { isConnected, error, clearError, fleetState, needsLogin } = useFleetSocket();
+  const { isConnected, error, clearError, fleetState } = useFleetSocket();
 
   useEffect(() => {
     if (!error) return;
@@ -14,13 +14,6 @@ export function FleetStatusBanner() {
   }, [error, clearError]);
 
   if (isConnected && !error) return null;
-  if (needsLogin && !error) {
-    return (
-      <div role="status" style={{ margin: "0 0 12px", padding: "8px 14px", borderRadius: 6, border: "1px solid var(--border-tactical)", background: "var(--bg-elevated)", color: "var(--text-secondary)", fontFamily: "var(--font-mono)", fontSize: 12, fontWeight: 700 }}>
-        Sign in to view live fleet data. <a href="/login" style={{ color: "var(--solar-terracotta)", textDecoration: "underline" }}>Go to login</a>
-      </div>
-    );
-  }
   const offline = !isConnected;
   const color = offline ? "#F59E0B" : "#EF4444";
   return (

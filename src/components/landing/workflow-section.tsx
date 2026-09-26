@@ -47,23 +47,23 @@ const WORKFLOW_STEPS: WorkflowStep[] = [
     title: "Local Intelligence: Edge Perception",
     icon: <Eye className="w-5 h-5 text-blue-500" />,
     subtitle: "20Hz 3D LiDAR Point Cloud Clustering",
-    triggerEvent: "Onboard sensor package classifies spatial boundaries and static/dynamic obstacles in <12ms.",
-    edgeAction: "Jetson Orin updates local 2.5D costmap with ISO 3691-4 Cat-3 dynamic safety bubbles (0.5m lateral clearance).",
+    triggerEvent: "Onboard sensors detect a static or dynamic obstacle on the robot's route.",
+    edgeAction: "The robot marks the aisle impassable in its own local map (reference design: ISO 3691-4-style clearance zones).",
     outcome: "AMR-03 verifies corridor Aisle B-07 is completely blocked and initiates local re-planning sub-routine.",
     color: "#2563EB",
-    techPayload: "LOCAL_COSTMAP_UPDATE: Resolution 0.05m | Voxel Cluster Count: 1,420 | Time: 11.8ms",
+    techPayload: "LOCAL_MAP_UPDATE: illustrative packet | aisle marked impassable",
   },
   {
     id: 3,
     phase: "PHASE 03",
     title: "Peer Coordination: V2V Gossip Mesh",
     icon: <Radio className="w-5 h-5 text-indigo-500" />,
-    subtitle: "ROS 2 / Zenoh Zero-Copy Ad-Hoc Broadcast",
+    subtitle: "Peer-to-Peer Broadcast on the Mesh",
     triggerEvent: "AMRs broadcast state vectors, current velocity, and intent payloads to peer robots within radio range.",
-    edgeAction: "Zenoh peer-to-peer gossip protocol transmits 48-byte binary CDR packets over 5GHz Wi-Fi ad-hoc mesh.",
-    outcome: "All 3 AMRs achieve distributed quorum in <6ms with zero central server or cloud relay dependencies.",
+    edgeAction: "The alert is broadcast to every peer on the mesh (in this simulation an in-process pub/sub bus; a network transport such as Zenoh/DDS is the intended swap-in).",
+    outcome: "All 3 AMRs learn of the blockage from the mesh with no central server or cloud relay.",
     color: "#6366F1",
-    techPayload: "V2V_BROADCAST: Topic 'edgefleet/intent' | Hops: 1 | Payload: 48 bytes | Latency: 5.4ms",
+    techPayload: "OBSTACLE_ALERT: illustrative packet | broadcast to all peers on the mesh",
   },
   {
     id: 4,
@@ -80,14 +80,14 @@ const WORKFLOW_STEPS: WorkflowStep[] = [
   {
     id: 5,
     phase: "PHASE 05",
-    title: "Dynamic Routing: D* Lite Detour",
+    title: "Dynamic Routing: A* Detour",
     icon: <GitFork className="w-5 h-5 text-purple-500" />,
     subtitle: "Real-Time Graph Repair & Perimeter Detour",
     triggerEvent: "AMR-03 must fulfill its pallet delivery despite blocked highway Aisle B-07.",
-    edgeAction: "Onboard D* Lite algorithm calculates optimal alternative trajectory P-2 around perimeter racks in 42ms.",
+    edgeAction: "Each robot re-runs A* on its own graph and picks the alternative route around the perimeter racks.",
     outcome: "AMR-03 transitions smoothly into detour path without stopping or waiting for operator intervention.",
     color: "#8B5CF6",
-    techPayload: "D_STAR_LITE_REPLAN: Nodes Visited: 84 | Cost Delta: +14.2% | Converged in 41.6ms",
+    techPayload: "ASTAR_REPLAN: illustrative packet | route re-planned around the blocked aisle",
   },
   {
     id: 6,
@@ -97,7 +97,7 @@ const WORKFLOW_STEPS: WorkflowStep[] = [
     subtitle: "Zero SPOF & Continuous Warehouse Throughput",
     triggerEvent: "Corridor C-14 cleared; AMR-02 claims next lease; AMR-03 reaches delivery dock on detour.",
     edgeAction: "Autonomous leases release automatically upon corridor exit beacon detection; mesh quorum remains 100% nominal.",
-    outcome: "3.2x faster bottleneck resolution vs central cloud systems; 0 collision violations; 0 human dispatches required.",
+    outcome: "Measured result: see the live benchmark below (decentralized vs stop-and-wait). 0 collisions; no human dispatch needed.",
     color: "#059669",
     techPayload: "METRICS: Collisions: 0 | P99 Latency: 42ms | Central Cloud Uptime Req: 0.0%",
   },
@@ -279,7 +279,7 @@ export function WorkflowSection() {
                 <span style={{ color: "var(--status-nominal)" }}>●</span>
                 <span style={{ color: "var(--text-primary)" }}>{activeStep.techPayload}</span>
               </div>
-              <span>Deterministic Time Guarantee: &le; 84ms</span>
+              <span>Illustrative packet, not a measurement</span>
             </div>
           </div>
         </div>

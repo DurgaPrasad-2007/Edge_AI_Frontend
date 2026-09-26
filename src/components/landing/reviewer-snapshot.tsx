@@ -5,14 +5,14 @@ export function ReviewerSnapshot() {
   const points = [
     { label: "SIH Challenge ID", val: "Problem Statement 26123 (BEL)", status: "Official" },
     { label: "Submission Scope", val: "Software-first 3-AMR peer mesh evaluation prototype", status: "Verified" },
-    { label: "Coordination Protocol", val: "Decentralized P2P Space-Time Mutex & Contract-Net", status: "Zero SPOF" },
-    { label: "Decision Latency", val: "p95 < 150ms over local LAN (~84ms observed in testbed)", status: "Target Met" },
-    { label: "Chokepoint Arbitration", val: "Corridor C-14 deterministic utility leases", status: "0 Deadlocks" },
-    { label: "Dynamic Obstacle Detour", val: "Aisle B-07 invalidation & autonomous D* Lite reroute", status: "Real-time" },
-    { label: "Safety Standard", val: "Engineered to ISO 3691-4 clearance principles (0.5m envelope)", status: "Aligned Design" },
+    { label: "Coordination Protocol", val: "Robot agents on a peer message bus: claims, leases and auctions are decided between robots", status: "No central planner" },
+    { label: "Decision Loop", val: "Each robot decides onboard every 0.6 s control tick; no cloud round-trip", status: "Onboard" },
+    { label: "Chokepoint Arbitration", val: "Corridor C-14 leased by claim on the mesh; expires if the holder goes silent", status: "0 Deadlocks (tested)" },
+    { label: "Dynamic Obstacle Detour", val: "Blockage is broadcast on the mesh; every robot re-plans with A*", status: "Real-time" },
+    { label: "Safety Standard", val: "Two-node look-ahead reservations + separation monitor. ISO 3691-4 is a design reference, not a certification", status: "Design reference" },
     { label: "Web API Boundary", val: "Zero-Motion Observer: console & API issue no wheel commands", status: "Enforced" },
     { label: "Knowledge Store", val: "PostgreSQL 16 + pgvector (384-d HNSW index)", status: "Audit Only" },
-    { label: "Edge Hardware Footprint", val: "Raspberry Pi 5 / Jetson Orin (<120MB RAM, <12W)", status: "SWaP-C" },
+    { label: "Edge Hardware Target", val: "Raspberry Pi / Jetson-class onboard compute (design target; the simulation runs on a laptop)", status: "Target" },
   ];
 
   return (

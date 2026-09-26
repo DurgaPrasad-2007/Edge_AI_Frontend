@@ -60,7 +60,7 @@ export function TelemetryPanel({
 
         <p style={{ fontSize: 12, color: "var(--text-secondary)", lineHeight: 1.5, margin: 0 }}>
           {reservation
-            ? `${leaseHolder?.name ?? reservation} holds the exclusive single-lane lease. Other AMRs wait at the hold points until it exits.`
+            ? `${leaseHolder?.name ?? reservation} holds the single-lane lease. It is a claim broadcast on the mesh: peers respect it, and it expires on its own if that robot goes silent.`
             : "Zone is unoccupied. The next AMR to reach it is granted the lease; simultaneous arrivals are ranked by the score above."}
         </p>
       </div>
@@ -122,7 +122,7 @@ export function TelemetryPanel({
                       }`}
                       style={{ fontSize: 10, padding: "2px 6px" }}
                     >
-                      {r.status}
+                      {r.online === false ? "OFFLINE" : r.status}
                     </span>
                     <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
                   </div>
@@ -131,6 +131,17 @@ export function TelemetryPanel({
                 <div style={{ fontSize: 11, color: "var(--text-secondary)", marginBottom: 6, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                   Task: <span className="font-mono">{r.task}</span>
                 </div>
+
+                {/* The robot's own reasoning: proof it decides locally */}
+                {r.decision && (
+                  <div
+                    title={r.decision}
+                    style={{ fontSize: 11, color: "var(--text-secondary)", lineHeight: 1.4, marginBottom: 6, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}
+                  >
+                    <span style={{ color: "var(--text-muted)" }}>Decided: </span>
+                    {r.decision}
+                  </div>
+                )}
 
                 {/* Battery Bar with Numerical Indicator */}
                 <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 11 }}>

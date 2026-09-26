@@ -47,7 +47,7 @@ export function Footer() {
           </div>
           <p style={{ fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.6, maxWidth: 380 }}>
             Decentralized peer-to-peer fleet coordination for autonomous mobile robots (AMRs) in high-density smart
-            industrial warehouses. Eliminates single-point-of-failure dispatchers with sub-84ms local consensus.
+            industrial warehouses. Removes the single-point-of-failure dispatcher: robots negotiate right-of-way and tasks directly with each other.
           </p>
           <div style={{ marginTop: 14, display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: "var(--text-secondary)" }}>
             <ShieldCheck className="w-4 h-4" style={{ color: "var(--solar-terracotta)" }} />

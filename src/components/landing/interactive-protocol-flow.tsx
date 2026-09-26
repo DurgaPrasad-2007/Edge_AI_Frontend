@@ -320,12 +320,12 @@ export function InteractiveProtocolFlow() {
         <div className="section-kicker">Autonomous Consensus Protocol (IEEE &amp; SIH 26123)</div>
         <h2 className="section-display-title">
           <span className="text-display-muted">4-Stage Peer Lifecycle. </span>
-          <span className="text-display-emphasis">Sub-150ms Bounded Decisions.</span>
+          <span className="text-display-emphasis">Decisions Made Onboard.</span>
         </h2>
         <p className="section-description">
           Follow the deterministic peer-to-peer coordination cycle from physical LiDAR obstacle perception to
-          space-time corridor leases and Contract-Net task re-bidding. All operations execute locally with p95 &lt; 150ms
-          decision latency.
+          corridor leases and Contract-Net task re-bidding. Every decision is made onboard each robot from the messages it
+          has heard; nothing waits on a central server. (Packet contents below are illustrative, not measurements.)
         </p>
       </div>
 
@@ -545,7 +545,7 @@ export function InteractiveProtocolFlow() {
                 </div>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
                   <span className="hw-label">RAM Footprint:</span>
-                  <span className="hw-val" style={{ fontWeight: 600, color: "var(--text-primary)" }}>&lt; 120 MB (SWaP-C)</span>
+                  <span className="hw-val" style={{ fontWeight: 600, color: "var(--text-primary)" }}>Not measured (simulation)</span>
                 </div>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   <span className="hw-label">Peer Transport:</span>

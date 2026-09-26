@@ -16,6 +16,7 @@ import { useAuth } from "@/components/auth-provider";
 
 const apiBase = process.env.NEXT_PUBLIC_EDGE_API_BASE_URL ?? "http://localhost:8000";
 const wsBase = apiBase.replace(/^http/, "ws");
+export const API_BASE = apiBase;
 // Mirrors the backend's AUTH_REQUIRED: when true there is nothing to stream without a session.
 const authRequired = process.env.NEXT_PUBLIC_AUTH_REQUIRED !== "false";
 
@@ -49,6 +50,10 @@ export interface RobotState {
   completed: number;
   payload_capacity_kg?: number;
   current_payload_kg?: number;
+  /** the robot's own last decision, in words (why it yielded, rerouted, won a bid...) */
+  decision?: string;
+  /** false while its radio is silent */
+  online?: boolean;
 }
 
 export interface FleetEvent {
@@ -109,6 +114,8 @@ export interface FleetState {
   robots: RobotState[];
   tasks: TaskRecord[];
   kpis: ServerKpis;
+  /** coordination policy the mesh is running */
+  mode?: string;
 }
 
 export interface WorldNode { id: string; x: number; y: number; label: string; type: "rack" | "dock" | "corridor" | "transit" | "charge"; }
@@ -168,6 +175,25 @@ export interface FleetHistory {
   heat: Record<string, number>;
 }
 
+/** GET /api/benchmark: decentralized mesh vs stop-and-wait, measured headless on identical assignments. */
+export interface BenchmarkResult {
+  workload: string;
+  reduction_pct: number;
+  median_reduction_pct: number;
+  makespan_reduction_pct: number;
+  waiting_reduction_pct: number;
+  stop_and_wait_mission_seconds: number;
+  decentralized_mission_seconds: number;
+  stop_and_wait_makespan_seconds: number;
+  decentralized_makespan_seconds: number;
+  runs: number;
+  runs_slower: number;
+  collisions_stop_and_wait: number;
+  collisions_decentralized: number;
+  all_completed: boolean;
+  target_pct: number;
+}
+
 export type ConnectionMode = "live" | "offline";
 
 export interface FleetSocketState {
@@ -186,7 +212,8 @@ export interface FleetSocketState {
   error: string | null;
   clearError: () => void;
   robotColor: (robotId?: string | null) => string;
-  sendControl: (action: "start" | "pause" | "reset") => Promise<boolean>;
+  /** `clearJobs` (reset only): also drop unfinished jobs, for a genuinely fresh floor. */
+  sendControl: (action: "start" | "pause" | "reset", options?: { clearJobs?: boolean }) => Promise<boolean>;
   createTask: (input: TaskCreateInput) => Promise<TaskRecord | null>;
   updateTask: (taskId: string, input: TaskUpdateInput) => Promise<TaskRecord | null>;
   deleteTask: (taskId: string) => Promise<boolean>;
@@ -253,7 +280,8 @@ const FleetContext = createContext<FleetSocketState | null>(null);
 export function FleetProvider({ children }: { children: ReactNode }) {
   const { session, loading: authLoading } = useAuth();
   const token = session?.access_token ?? null;
-  const canConnect = !authLoading && (!authRequired || token !== null);
+  // Always connect WebSocket so public landing page demo streams live telemetry without requiring login
+  const canConnect = !authLoading;
 
   const [fleetState, setFleetState] = useState<FleetState | null>(null);
   const [world, setWorld] = useState<World | null>(null);
@@ -270,13 +298,10 @@ export function FleetProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  // Signing out drops everything the previous session could see.
+  // Signing out resets operator token but keeps public telemetry streaming for demo
   useEffect(() => {
     if (!authLoading && authRequired && token === null) {
       lastSeq.current = 0;
-      setFleetState(null);
-      setWorld(null);
-      setHistory(EMPTY_HISTORY);
     }
   }, [authLoading, token]);
 
@@ -347,12 +372,16 @@ export function FleetProvider({ children }: { children: ReactNode }) {
           headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
         });
         if (!res.ok) {
-          setError(describeError(await res.json().catch(() => null), res.status));
+          const err = describeError(await res.json().catch(() => null), res.status);
+          setError(err);
+          setTimeout(() => setError((prev) => (prev === err ? null : prev)), 5000);
           return null;
         }
         return res.status === 204 ? (true as unknown as T) : ((await res.json()) as T);
       } catch {
-        setError("Backend unreachable — command was not sent");
+        const msg = "Backend unreachable — command was not sent";
+        setError(msg);
+        setTimeout(() => setError((prev) => (prev === msg ? null : prev)), 4000);
         return null;
       }
     },
@@ -369,8 +398,8 @@ export function FleetProvider({ children }: { children: ReactNode }) {
   );
 
   const sendControl = useCallback(
-    (action: "start" | "pause" | "reset") =>
-      action === "reset" ? post("/api/fleet/reset") : post("/api/fleet/simulation", { running: action === "start" }),
+    (action: "start" | "pause" | "reset", options?: { clearJobs?: boolean }) =>
+      action === "reset" ? post(`/api/fleet/reset${options?.clearJobs ? "?clear_tasks=true" : ""}`) : post("/api/fleet/simulation", { running: action === "start" }),
     [post]
   );
 

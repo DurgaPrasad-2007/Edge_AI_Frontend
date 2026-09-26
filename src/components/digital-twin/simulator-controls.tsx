@@ -1,6 +1,6 @@
 "use client";
 
-import { Play, Pause, RotateCcw, AlertTriangle, Radio, Flame } from "lucide-react";
+import { Play, Pause, RotateCcw, AlertTriangle, Radio, Flame, MessageSquare } from "lucide-react";
 import type { RobotState } from "@/lib/fleet-contract";
 
 interface SimulatorControlsProps {
@@ -14,6 +14,8 @@ interface SimulatorControlsProps {
   onToggleRadar?: () => void;
   showHeatmap?: boolean;
   onToggleHeatmap?: () => void;
+  showMesh?: boolean;
+  onToggleMesh?: () => void;
   /** e.g. "Aisle B-07" — the obstacle the inject button toggles */
   aisleLabel?: string;
   /** true while the backend is unreachable: commands cannot be sent */
@@ -31,9 +33,12 @@ export function SimulatorControls({
   onToggleRadar,
   showHeatmap = false,
   onToggleHeatmap,
+  showMesh = true,
+  onToggleMesh,
   aisleLabel = "Aisle",
   disabled = false,
 }: SimulatorControlsProps) {
+
   return (
     <div className="simulator-toolbar" role="toolbar" aria-label="Floor Simulation Controls">
       {/* Fleet Swatches / Legend */}
@@ -87,13 +92,28 @@ export function SimulatorControls({
           </button>
         )}
 
+        {/* Mesh Conversation Dialogue Toggle */}
+        {onToggleMesh && (
+          <button
+            type="button"
+            onClick={onToggleMesh}
+            className={`btn ${showMesh ? "btn-active-toggle" : "btn-secondary"}`}
+            style={{ padding: "5px 10px", fontSize: 11 }}
+            title="Toggle Robot-to-Robot Mesh Conversation Stream"
+          >
+            <MessageSquare className="w-3.5 h-3.5" />
+            <span>Mesh Dialogue</span>
+          </button>
+        )}
+
+
         {/* Reset Floor */}
         <button
           type="button"
           onClick={onReset}
           className="btn btn-secondary"
           style={{ padding: "6px 12px", fontSize: 12 }}
-          title="Return robots to their docks and requeue in-flight tasks"
+          title="Return robots to their docks and clear obstacles (unfinished jobs are dropped on the landing page, re-queued in the console)"
           disabled={disabled}
         >
           <RotateCcw className="w-3.5 h-3.5" />
@@ -127,7 +147,7 @@ export function SimulatorControls({
             </>
           ) : (
             <>
-              <Play className="w-3.5 h-3.5" /> Run Fleet
+              <Play className="w-3.5 h-3.5" /> Resume Fleet
             </>
           )}
         </button>

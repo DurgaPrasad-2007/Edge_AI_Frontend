@@ -250,15 +250,16 @@ export function WarehouseMap({
               MUTEX SINGLE-LANE
             </text>
             <rect
-              x={zone.x - 35}
+              x={zone.x - 45}
               y={zone.y + 6}
-              width="70"
+              width="90"
               height="16"
-              rx="3"
+              rx="4"
               fill={holder ? "var(--status-active)" : "var(--bg-elevated)"}
               stroke={holder ? "var(--status-active)" : "var(--border-tactical)"}
+              strokeWidth="1"
             />
-            <text x={zone.x} y={zone.y + 18} textAnchor="middle" fill={holder ? "var(--primary-foreground)" : "var(--text-secondary)"} fontSize="8.5" fontWeight="800" fontFamily="var(--font-mono)">
+            <text x={zone.x} y={zone.y + 17.5} textAnchor="middle" fill={holder ? "var(--primary-foreground)" : "var(--text-secondary)"} fontSize="8" fontWeight="800" fontFamily="var(--font-mono)" letterSpacing="0.02em">
               {holder ? `[HOLD: ${holder}]` : "OPEN // IDLE"}
             </text>
           </g>
@@ -304,10 +305,11 @@ export function WarehouseMap({
             <circle cx={n.x} cy={n.y} r="22" fill="none" stroke="#EF4444" className="animate-pulse-ring" />
             <circle cx={n.x} cy={n.y} r="18" fill="var(--bg-surface)" stroke="#EF4444" strokeWidth="2" />
             <path d={`M ${n.x - 8} ${n.y - 8} L ${n.x + 8} ${n.y + 8} M ${n.x + 8} ${n.y - 8} L ${n.x - 8} ${n.y + 8}`} stroke="#EF4444" strokeWidth="2.5" strokeLinecap="round" />
-            <rect x={n.x - 75} y={n.y + 22} width="150" height="15" rx="3" fill="var(--bg-surface)" stroke="#EF4444" strokeWidth="0.8" />
-            <text x={n.x} y={n.y + 33} textAnchor="middle" fill="#EF4444" fontSize="8" fontWeight="800" fontFamily="var(--font-mono)">
+            <rect x={n.x - 85} y={n.y + 22} width="170" height="16" rx="4" fill="var(--bg-surface)" stroke="#EF4444" strokeWidth="1" />
+            <text x={n.x} y={n.y + 33} textAnchor="middle" fill="#EF4444" fontSize="7.5" fontWeight="800" fontFamily="var(--font-mono)" letterSpacing="0.02em">
               {n.label.replace(/\s*\[.*\]/, "").toUpperCase()} BLOCKED
             </text>
+
           </g>
         );
       })}

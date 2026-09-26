@@ -20,11 +20,20 @@ import { TelemetryPanel } from "@/components/digital-twin/telemetry-panel";
 import { EventStream } from "@/components/digital-twin/event-stream";
 import { RagSearch } from "@/components/digital-twin/rag-search";
 import { LiveTelemetryChart } from "@/components/digital-twin/live-telemetry-chart";
+import { MeshConversation } from "@/components/digital-twin/mesh-conversation";
 import { RobotHudModal } from "@/components/digital-twin/robot-hud-modal";
 import { DemoPresenterGuide, type DemoScenario } from "@/components/digital-twin/demo-presenter-guide";
 import { CommandPalette } from "@/components/ui/command-palette";
 import { FleetStatusBanner } from "@/components/fleet-status-banner";
 import { playClick, playWarning, playLeaseAcquired, playChirp, playRadarPing } from "@/lib/sound-effects";
+
+const SCENARIO_NAMES: Record<string, string> = {
+  mutex: "Head-on Chokepoint Mutex",
+  obstacle: "Dynamic Obstacle A* Replan",
+  auction: "Contract-Net Task Auction",
+  dropout: "Agent Dropout & Lease Expiry",
+  battery: "Low Battery & Auto-Charge",
+};
 
 export function LandingPage() {
   const {
@@ -34,9 +43,11 @@ export function LandingPage() {
     tasks,
     events,
     p2pMessages,
+    robotColor,
     isConnected,
     sendControl,
     injectBlockage,
+    setBlockage,
     requestReservation,
     publishIntent,
     createTask,
@@ -54,26 +65,8 @@ export function LandingPage() {
   const [inspectedRobot, setInspectedRobot] = useState<RobotState | null>(null);
   const [showRadar, setShowRadar] = useState(true);
   const [showHeatmap, setShowHeatmap] = useState(false);
+  const [showMeshConversation, setShowMeshConversation] = useState(true);
   const [showCmdPalette, setShowCmdPalette] = useState(false);
-  const autoStartedRef = useRef(false);
-
-  // Auto-seed a demonstration mission if fleet is completely idle on initial connection
-  useEffect(() => {
-    if (!isConnected || autoStartedRef.current || !world) return;
-    const activeTasks = tasks.filter((t) => t.status !== "Completed");
-    if (activeTasks.length === 0) {
-      autoStartedRef.current = true;
-      void sendControl("start");
-      void createTask({
-        pickup: "DOCK-W",
-        destination: "DOCK-E",
-        priority: 85,
-        payload_kg: 220,
-        payload_size: "medium",
-        urgency: "standard",
-      });
-    }
-  }, [isConnected, world, tasks, sendControl, createTask]);
 
   // Keep inspected robot in sync with live real telemetry
   useEffect(() => {
@@ -83,24 +76,33 @@ export function LandingPage() {
     }
   }, [robots, inspectedRobot]);
 
+  // One command in flight at a time: rapid clicks used to race on stale fleet state and fight each other.
+  const busy = useRef(false);
+  const [switching, setSwitching] = useState<string | null>(null);
+  const exclusive = async (fn: () => Promise<unknown>) => {
+    if (busy.current) return;
+    busy.current = true;
+    try {
+      await fn();
+    } finally {
+      busy.current = false;
+    }
+  };
+
   const handleToggleRunning = () => {
     playClick();
-    const willRun = !fleetState?.running;
-    void sendControl(willRun ? "start" : "pause");
+    void exclusive(() => sendControl(fleetState?.running ? "pause" : "start"));
   };
 
   const handleResetFloor = () => {
     playChirp();
-    void sendControl("reset");
+    void exclusive(() => sendControl("reset", { clearJobs: true }));
   };
 
   const handleInjectBlockage = () => {
-    if (fleetState?.aisle_blocked) {
-      playChirp();
-    } else {
-      playWarning();
-    }
-    void injectBlockage(aisleId);
+    if (fleetState?.aisle_blocked) playChirp();
+    else playWarning();
+    void exclusive(() => injectBlockage(aisleId));
   };
 
   const handleToggleRadar = () => {
@@ -108,40 +110,54 @@ export function LandingPage() {
     setShowRadar(!showRadar);
   };
 
-  const handleTriggerScenario = async (scenario: DemoScenario) => {
-    await sendControl("start");
-    if (scenario === "mutex") {
-      playLeaseAcquired();
-      // Dispatch two opposing missions converging on Corridor C-14 to physically demonstrate arbitration & yielding
-      await createTask({ pickup: "DOCK-W", destination: "DOCK-E", priority: 95, payload_kg: 250, payload_size: "medium", urgency: "critical" });
-      await createTask({ pickup: "DOCK-E", destination: "DOCK-W", priority: 65, payload_kg: 180, payload_size: "medium", urgency: "standard" });
-    } else if (scenario === "obstacle") {
-      playWarning();
-      // Block Aisle B-07 and dispatch a transit job that forces A* perimeter detour
-      if (!fleetState?.aisle_blocked) {
-        await injectBlockage(aisleId);
+  const handleTriggerScenario = (scenario: DemoScenario) =>
+    exclusive(async () => {
+      // Every scenario starts from a clean floor (reset clears robots, leases, blockages). Guests cannot delete
+      // tasks, so no cleanup round-trips; start is skipped when the fleet is already running.
+      setSwitching(scenario);
+      const minVisible = new Promise((resolve) => setTimeout(resolve, 700)); // long enough to be noticed, short enough not to nag
+      try {
+        await sendControl("reset", { clearJobs: true });
+        if (!fleetState?.running) await sendControl("start");
+      const robotIds = world?.robots.map((r) => r.id) ?? robots.map((r) => r.id);
+      const target = robotIds[1] ?? robotIds[0];
+      // Every scenario keeps all three robots busy, so what you watch is the group managing the situation.
+      const job = (pickup: string, destination: string, priority: number, kg: number, urgency: "low" | "standard" | "critical" = "standard") =>
+        createTask({ pickup, destination, priority, payload_kg: kg, payload_size: kg > 400 ? "heavy" : kg > 150 ? "medium" : "small", urgency });
+      if (scenario === "mutex") {
+        playLeaseAcquired();
+        // Two robots meet head-on at the corridor while the third works the north-south lane.
+        await Promise.all([job("DOCK-W", "DOCK-E", 95, 250, "critical"), job("DOCK-E", "DOCK-W", 65, 180), job("INT-N1", "INT-S2", 55, 100)]);
+      } else if (scenario === "obstacle") {
+        playWarning();
+        // Everyone is mid-route on the lower highway when the aisle gets blocked; all of them re-plan.
+        const jobs = await Promise.all([job("BYPASS-W", "BYPASS-E", 80, 160), job("BYPASS-E", "BYPASS-W", 75, 120), job("RACK B-03", "DOCK-W", 70, 140)]);
+        void jobs;
+        await new Promise((r) => setTimeout(r, 2500));
+        await setBlockage(aisleId, true);
+      } else if (scenario === "auction") {
+        playChirp();
+        // Four jobs at once: every robot bids on every job, and each job goes to whoever fits it best.
+        await Promise.all([job("RACK A-02", "DOCK-E", 90, 320, "critical"), job("RACK C-01", "DOCK-W", 70, 500), job("RACK A-04", "RACK B-02", 60, 90), job("RACK B-04", "DOCK-W", 50, 200)]);
+      } else if (scenario === "dropout") {
+        playWarning();
+        // Three robots working; one loses its radio. Peers notice the silence, take its job back and finish it.
+        const jobs = await Promise.all([job("RACK A-03", "DOCK-W", 80, 120, "critical"), job("DOCK-E", "DOCK-W", 60, 180), job("RACK A-01", "DOCK-E", 55, 100)]);
+        const victim = jobs.find((j) => j?.assigned_robot_id)?.assigned_robot_id ?? target;
+        await new Promise((r) => setTimeout(r, 1500));
+        if (victim) await simulateAgentDropout(victim);
+      } else if (scenario === "battery") {
+        playChirp();
+        // All three robots have work; one runs low, hands its job back to the mesh, and the others absorb it.
+        const jobs = await Promise.all([job("RACK A-01", "DOCK-E", 70, 100), job("RACK A-03", "DOCK-W", 65, 100), job("RACK B-02", "DOCK-E", 60, 100)]);
+        const victim = jobs[1]?.assigned_robot_id ?? target;
+        await new Promise((r) => setTimeout(r, 800));
+        if (victim) await setRobotBattery(victim, 22.0);
       }
-      await createTask({ pickup: "BYPASS-W", destination: "BYPASS-E", priority: 80, payload_kg: 160, payload_size: "small", urgency: "standard" });
-    } else if (scenario === "auction") {
-      // Contract-Net demo: dispatch a real task between rack and dock, triggering multi-AMR bidding
-      playChirp();
-      await createTask({ pickup: "RACK A-02", destination: "DOCK-E", priority: 90, payload_kg: 320, payload_size: "heavy", urgency: "critical" });
-    } else if (scenario === "dropout") {
-      // Agent Dropout & Lease Expiry demo: simulate radio blackout on an AMR
-      playWarning();
-      const targetRobot = robots.find((r) => r.status !== "Blocked") ?? robots[1] ?? robots[0];
-      if (targetRobot) {
-        await simulateAgentDropout(targetRobot.id);
+      } finally {
+        setSwitching(null);
       }
-    } else if (scenario === "battery") {
-      // Low Battery & Opportunity Charging demo: drop battery to 22% (<30% threshold)
-      playChirp();
-      const targetRobot = robots.find((r) => r.status !== "Charging" && r.leg !== "to_charge") ?? robots[1] ?? robots[0];
-      if (targetRobot) {
-        await setRobotBattery(targetRobot.id, 22.0);
-      }
-    }
-  };
+    });
 
   return (
     <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
@@ -196,7 +212,13 @@ export function LandingPage() {
 
           <div className="simulator-container">
             {/* Map Canvas & Toolbar */}
-            <div className="simulator-map-wrap">
+            <div className="simulator-map-wrap" style={{ position: "relative" }}>
+              {switching && (
+                <div role="status" aria-live="polite" style={{ position: "absolute", inset: 0, zIndex: 20, display: "flex", alignItems: "center", justifyContent: "center", gap: 10, background: "color-mix(in srgb, var(--bg-surface) 72%, transparent)", backdropFilter: "blur(2px)", fontFamily: "var(--font-mono)", fontSize: 12, fontWeight: 700, color: "var(--text-primary)" }}>
+                  <span className="animate-spin" style={{ width: 16, height: 16, borderRadius: "50%", border: "2px solid var(--border-tactical)", borderTopColor: "var(--status-active)" }} />
+                  Loading scenario: {SCENARIO_NAMES[switching] ?? switching}…
+                </div>
+              )}
               <SimulatorControls
                 isRunning={Boolean(fleetState?.running)}
                 onToggleRunning={handleToggleRunning}
@@ -211,8 +233,13 @@ export function LandingPage() {
                   playClick();
                   setShowHeatmap(!showHeatmap);
                 }}
+                showMesh={showMeshConversation}
+                onToggleMesh={() => {
+                  playClick();
+                  setShowMeshConversation(!showMeshConversation);
+                }}
                 aisleLabel={world?.nodes.find((n) => n.id === aisleId)?.label}
-                disabled={!isConnected}
+                disabled={!isConnected || switching !== null}
               />
 
               <WarehouseMap
@@ -230,6 +257,14 @@ export function LandingPage() {
               />
 
               {/* Real-time Telemetry & Latency Sparkline Chart */}
+              {showMeshConversation && (
+                <MeshConversation
+                  messages={p2pMessages}
+                  robotColor={robotColor}
+                  onClose={() => setShowMeshConversation(false)}
+                />
+              )}
+
               <LiveTelemetryChart isRunning={Boolean(fleetState?.running)} messages={fleetState?.messages ?? 0} />
 
               <div
